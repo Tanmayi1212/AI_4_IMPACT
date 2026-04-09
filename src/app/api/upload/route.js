@@ -1,8 +1,8 @@
-import { NextResponse } from 'next/server';
+import { NextResponse } from "next/server";
+import { POST as uploadPaymentScreenshot } from "./payment-screenshot/route";
 
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const RATE_LIMIT_MAX_REQUESTS = 8;
-const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 const uploadRateLimitStore = globalThis.__uploadRateLimitStore || new Map();
 
 if (!globalThis.__uploadRateLimitStore) {
@@ -10,9 +10,9 @@ if (!globalThis.__uploadRateLimitStore) {
 }
 
 function getClientIp(request) {
-  const forwarded = request.headers.get('x-forwarded-for') || '';
-  const firstIp = forwarded.split(',')[0].trim();
-  return firstIp || 'unknown';
+  const forwarded = request.headers.get("x-forwarded-for") || "";
+  const firstIp = forwarded.split(",")[0].trim();
+  return firstIp || "unknown";
 }
 
 function hitRateLimit(key) {
@@ -38,72 +38,36 @@ export async function POST(request) {
     const clientIp = getClientIp(request);
     if (hitRateLimit(`upload:${clientIp}`)) {
       return NextResponse.json(
-        { success: false, error: 'Too many upload attempts. Please retry in a minute.' },
+        { success: false, error: "Too many upload attempts. Please retry in a minute." },
         { status: 429 }
       );
     }
 
-    const imgbbApiKey = process.env.IMGBB_API_KEY;
-    if (!imgbbApiKey) {
+    const phase1Response = await uploadPaymentScreenshot(request);
+    const responseBody = await phase1Response.json();
+
+    if (!phase1Response.ok || !responseBody?.success || !responseBody?.screenshot_url) {
       return NextResponse.json(
-        { success: false, error: 'Upload service is not configured' },
-        { status: 500 }
-      );
-    }
-
-    const formData = await request.formData();
-    const file = formData.get("image");
-
-    if (!file) {
-      return NextResponse.json({ success: false, error: "No image file provided" }, { status: 400 });
-    }
-
-    if (!file.type?.startsWith('image/')) {
-      return NextResponse.json(
-        { success: false, error: 'Only image uploads are allowed' },
-        { status: 400 }
-      );
-    }
-
-    if (file.size > MAX_UPLOAD_BYTES) {
-      return NextResponse.json(
-        { success: false, error: 'Image is too large. Max allowed size is 5MB.' },
-        { status: 400 }
-      );
-    }
-
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-    const base64String = buffer.toString('base64');
-
-    const bodyParams = new URLSearchParams();
-    bodyParams.append("image", base64String);
-
-    const imgbbReq = await fetch(
-      `https://api.imgbb.com/1/upload?key=${imgbbApiKey}`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded"
+        {
+          success: false,
+          error: responseBody?.error || "Upload failed",
         },
-        body: bodyParams.toString()
-      }
-    );
-
-    const imgbbRes = await imgbbReq.json();
-
-    if (imgbbRes.success) {
-      return NextResponse.json({ success: true, url: imgbbRes.data.url });
+        { status: phase1Response.status }
+      );
     }
 
     return NextResponse.json(
-      { success: false, error: "Upload failed" },
-      { status: 400 }
+      {
+        success: true,
+        url: responseBody.screenshot_url,
+        screenshot_url: responseBody.screenshot_url,
+      },
+      { status: phase1Response.status }
     );
-
   } catch (error) {
+    console.error("Upload compatibility route failed:", error);
     return NextResponse.json(
-      { success: false, error: 'Image upload failed. Please retry.' },
+      { success: false, error: "Image upload failed. Please retry." },
       { status: 500 }
     );
   }

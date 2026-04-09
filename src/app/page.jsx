@@ -37,7 +37,7 @@ export default function Home() {
             } else {
                 setUploadStatus(`[!] UPLOAD FAILED. TRY AGAIN.`);
             }
-        } catch (error) {
+        } catch {
             setUploadStatus("[!] SECURE CONNECTION LOST. TRY AGAIN.");
         } finally {
             setIsUploading(false);
@@ -114,6 +114,7 @@ export default function Home() {
             <nav className="navbar">
                 <div className="logo">AI<span>4</span>Impact <span className="decal-barcode">|| | || |</span></div>
                 <div className="nav-links">
+                    <a href="/auth">[ AUTH ]</a>
                     <a href="#about">[ ABOUT ]</a>
                     <a href="#objectives">[ OBJECTIVES ]</a>
                     <a href="#timeline">[ TIMELINE ]</a>
@@ -129,7 +130,12 @@ export default function Home() {
                     <h1>AI <span className="text-pink">4</span> IMPACT</h1>
                     <p className="tagline">/// LEARN. BUILD. IMPACT.</p>
                     <p className="dates">DATE: 15.04.26 - 18.04.26 <span className="text-red">!WARNING!</span></p>
-                    <a href="#register" className="btn">INITIATE_REGISTRATION()</a>
+                    <div style={{ display: 'flex', gap: '0.8rem', flexWrap: 'wrap' }}>
+                        <a href="#register" className="btn">INITIATE_REGISTRATION()</a>
+                        <a href="/auth" className="btn" style={{ boxShadow: '5px 5px 0 var(--neon-pink)' }}>
+                            OPEN_AUTH_PORTAL()
+                        </a>
+                    </div>
                 </div>
                 <div className="hero-graphic">
                     <div className="huge-logo">
@@ -446,9 +452,9 @@ export default function Home() {
                             </div>
                         </div>
 
-                        <button type="submit" id="submit-btn" className="btn" disabled={isUploading}
-                            style={{ width: '100%', textAlign: 'center', marginTop: '2rem', opacity: isUploading ? 0.5 : 1 }}>
-                            TRANSMIT COMPLETION()
+                        <button type="submit" id="submit-btn" className="btn" disabled={isUploading || isSubmitting}
+                            style={{ width: '100%', textAlign: 'center', marginTop: '2rem', opacity: (isUploading || isSubmitting) ? 0.5 : 1 }}>
+                            {isSubmitting ? 'TRANSMITTING...' : 'TRANSMIT COMPLETION()'}
                         </button>
                     </form>
 
