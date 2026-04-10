@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { useFieldArray, useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -10,6 +10,7 @@ import {
   doc,
   getDocs,
   increment,
+  limit,
   query,
   serverTimestamp,
   where,
@@ -17,26 +18,19 @@ import {
 } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { db, storage } from "../../../lib/firebase";
+import CyberDropdown from "./CyberDropdown";
 import PaymentSection from "./PaymentSection";
+import {
+  BRANCH_OPTIONS,
+  BRANCH_OPTIONS_WITH_OTHER,
+  INDIA_STATES,
+  OTHER_BRANCH_OPTION,
+  YEAR_OPTIONS,
+} from "./registrationOptions";
 import SubmitButton from "./SubmitButton";
 
 const phoneRegex = /^\d{10}$/;
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const YEAR_OPTIONS = ["1st year", "2nd year", "3rd year", "4th year"] as const;
-const BRANCH_OPTIONS = [
-  "CSE",
-  "AIDS",
-  "IOT",
-  "CSM",
-  "IT",
-  "BIO",
-  "CHEM",
-  "MECH",
-  "ECE",
-  "EVL",
-  "EEE",
-  "CIVIL",
-] as const;
 
 const memberSchema = z.object({
   name: z.string().trim(),
@@ -44,6 +38,7 @@ const memberSchema = z.object({
   phone: z.string().trim(),
   rollNumber: z.string().trim(),
   department: z.string().trim(),
+  branchOther: z.string().trim().optional(),
   yearOfStudy: z.string().trim(),
 });
 
@@ -51,11 +46,20 @@ const hackathonSchema = z
   .object({
     teamName: z.string().trim().min(1, "Team Name is required."),
     college: z.string().trim().min(1, "College / University is required."),
+    state: z.string().trim().min(1, "State is required."),
     teamSize: z.union([z.literal(3), z.literal(4)]),
     members: z.array(memberSchema).length(4),
     transactionId: z.string().trim().min(1, "Transaction ID is required."),
   })
   .superRefine((data, context) => {
+    if (!INDIA_STATES.includes(data.state as (typeof INDIA_STATES)[number])) {
+      context.addIssue({
+        code: "custom",
+        message: "Select a valid state.",
+        path: ["state"],
+      });
+    }
+
     for (let index = 0; index < data.teamSize; index += 1) {
       const member = data.members[index];
 
@@ -109,9 +113,15 @@ const hackathonSchema = z
           message: "Branch is required.",
           path: ["members", index, "department"],
         });
-      } else if (
-        !BRANCH_OPTIONS.includes(member.department.trim() as (typeof BRANCH_OPTIONS)[number])
-      ) {
+      } else if (member.department === OTHER_BRANCH_OPTION) {
+        if (!String(member.branchOther || "").trim()) {
+          context.addIssue({
+            code: "custom",
+            message: "Please enter branch name.",
+            path: ["members", index, "branchOther"],
+          });
+        }
+      } else if (!BRANCH_OPTIONS.includes(member.department as (typeof BRANCH_OPTIONS)[number])) {
         context.addIssue({
           code: "custom",
           message: "Select a valid branch.",
@@ -125,9 +135,7 @@ const hackathonSchema = z
           message: "Year is required.",
           path: ["members", index, "yearOfStudy"],
         });
-      } else if (
-        !YEAR_OPTIONS.includes(member.yearOfStudy.trim() as (typeof YEAR_OPTIONS)[number])
-      ) {
+      } else if (!YEAR_OPTIONS.includes(member.yearOfStudy as (typeof YEAR_OPTIONS)[number])) {
         context.addIssue({
           code: "custom",
           message: "Select a valid year.",
@@ -143,6 +151,13 @@ type MessageTone = "ok" | "error" | "info";
 
 interface HackathonFormProps {
   qrSrc: string;
+}
+
+function normalizeTeamName(teamName: string) {
+  return String(teamName || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
 }
 
 function AnimatedFieldError({ message }: { message?: string }) {
@@ -201,6 +216,7 @@ const createEmptyMember = () => ({
   phone: "",
   rollNumber: "",
   department: "",
+  branchOther: "",
   yearOfStudy: "",
 });
 
@@ -210,6 +226,7 @@ export default function HackathonForm({ qrSrc }: HackathonFormProps) {
     control,
     watch,
     setValue,
+    setError,
     clearErrors,
     handleSubmit,
     reset,
@@ -220,6 +237,7 @@ export default function HackathonForm({ qrSrc }: HackathonFormProps) {
     defaultValues: {
       teamName: "",
       college: "",
+      state: "",
       teamSize: 3,
       members: [
         createEmptyMember(),
@@ -231,12 +249,8 @@ export default function HackathonForm({ qrSrc }: HackathonFormProps) {
     },
   });
 
-  useFieldArray({
-    control,
-    name: "members",
-  });
-
   const teamSize = watch("teamSize");
+  const watchedMembers = watch("members");
 
   const [isUploading, setIsUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -309,38 +323,149 @@ export default function HackathonForm({ qrSrc }: HackathonFormProps) {
 
     setIsSubmitting(true);
 
-    const membersData = values.members.slice(0, values.teamSize).map((member) => ({
-      name: member.name.trim(),
-      email: member.email.trim().toLowerCase(),
-      phone: member.phone.trim(),
-      roll_number: member.rollNumber.trim(),
-      branch: member.department.trim(),
-      department: member.department.trim(),
-      year_of_study: member.yearOfStudy.trim(),
-      yearOfStudy: member.yearOfStudy.trim(),
-    }));
+    const activeMembers = values.members.slice(0, values.teamSize).map((member) => {
+      const resolvedBranch =
+        member.department === OTHER_BRANCH_OPTION
+          ? String(member.branchOther || "").trim()
+          : member.department.trim();
 
-    const memberEmails = membersData.map((m) => m.email);
-    const uniqueEmails = new Set(memberEmails);
-    if (uniqueEmails.size !== memberEmails.length) {
-      setSubmitError("Duplicate emails found in the form.");
+      return {
+        name: member.name.trim(),
+        email: member.email.trim().toLowerCase(),
+        phone: member.phone.trim(),
+        roll_number: member.rollNumber.trim(),
+        state: values.state.trim(),
+        branch: resolvedBranch,
+        department: resolvedBranch,
+        branch_selection: member.department.trim(),
+        year_of_study: member.yearOfStudy.trim(),
+        yearOfStudy: member.yearOfStudy.trim(),
+      };
+    });
+
+    const emailToIndices = new Map<string, number[]>();
+    const phoneToIndices = new Map<string, number[]>();
+
+    activeMembers.forEach((member, index) => {
+      const emailIndices = emailToIndices.get(member.email) || [];
+      emailIndices.push(index);
+      emailToIndices.set(member.email, emailIndices);
+
+      const phoneIndices = phoneToIndices.get(member.phone) || [];
+      phoneIndices.push(index);
+      phoneToIndices.set(member.phone, phoneIndices);
+    });
+
+    let hasInFormDuplicate = false;
+
+    emailToIndices.forEach((indices) => {
+      if (indices.length > 1) {
+        indices.forEach((index) => {
+          setError(`members.${index}.email` as const, {
+            type: "manual",
+            message: "This email is duplicated inside your team.",
+          });
+        });
+        hasInFormDuplicate = true;
+      }
+    });
+
+    phoneToIndices.forEach((indices) => {
+      if (indices.length > 1) {
+        indices.forEach((index) => {
+          setError(`members.${index}.phone` as const, {
+            type: "manual",
+            message: "This phone number is duplicated inside your team.",
+          });
+        });
+        hasInFormDuplicate = true;
+      }
+    });
+
+    if (hasInFormDuplicate) {
+      setSubmitError("Duplicate email/phone found in this team. Fix highlighted fields.");
+      setIsSubmitting(false);
       return;
     }
 
     try {
-      const existingParticipants = await getDocs(
-        query(collection(db, "participants"), where("email", "in", memberEmails))
-      );
-      const existingHackathonEmailSet = new Set(
-        existingParticipants.docs
-          .filter((participantDoc) => participantDoc.data().registration_type === "hackathon")
+      const uniqueMemberEmails = Array.from(new Set(activeMembers.map((member) => member.email)));
+      const uniqueMemberPhones = Array.from(new Set(activeMembers.map((member) => member.phone)));
+      const normalizedTeamName = normalizeTeamName(values.teamName);
+
+      const [existingEmailDocs, existingPhoneDocs, exactTeamDocs, normalizedTeamDocs] =
+        await Promise.all([
+          getDocs(query(collection(db, "participants"), where("email", "in", uniqueMemberEmails))),
+          getDocs(query(collection(db, "participants"), where("phone", "in", uniqueMemberPhones))),
+          getDocs(
+            query(
+              collection(db, "hackathon_registrations"),
+              where("team_name", "==", values.teamName.trim()),
+              limit(1)
+            )
+          ),
+          getDocs(
+            query(
+              collection(db, "hackathon_registrations"),
+              where("team_name_normalized", "==", normalizedTeamName),
+              limit(1)
+            )
+          ),
+        ]);
+
+      const existingEmailSet = new Set(
+        existingEmailDocs.docs
           .map((participantDoc) => String(participantDoc.data().email || "").trim().toLowerCase())
           .filter(Boolean)
       );
-      const duplicateEmail = memberEmails.find((email) => existingHackathonEmailSet.has(email));
+      const existingPhoneSet = new Set(
+        existingPhoneDocs.docs
+          .map((participantDoc) => String(participantDoc.data().phone || "").trim())
+          .filter(Boolean)
+      );
 
-      if (duplicateEmail) {
-        setSubmitError(`Email ${duplicateEmail} is already registered for hackathon.`);
+      let hasExistingDuplicate = false;
+
+      activeMembers.forEach((member, index) => {
+        if (existingEmailSet.has(member.email)) {
+          setError(`members.${index}.email` as const, {
+            type: "manual",
+            message: "This email already exists in registrations.",
+          });
+          hasExistingDuplicate = true;
+        }
+
+        if (existingPhoneSet.has(member.phone)) {
+          setError(`members.${index}.phone` as const, {
+            type: "manual",
+            message: "This phone number already exists in registrations.",
+          });
+          hasExistingDuplicate = true;
+        }
+      });
+
+      if (hasExistingDuplicate) {
+        setSubmitError("Email/phone must be unique. Resolve highlighted fields.");
+        return;
+      }
+
+      let teamNameTaken = !exactTeamDocs.empty || !normalizedTeamDocs.empty;
+
+      if (!teamNameTaken) {
+        const allTeamsSnapshot = await getDocs(collection(db, "hackathon_registrations"));
+        teamNameTaken = allTeamsSnapshot.docs.some((teamDoc) => {
+          const teamData = teamDoc.data() || {};
+          const rawName = String(teamData.team_name_normalized || teamData.team_name || "");
+          return normalizeTeamName(rawName) === normalizedTeamName;
+        });
+      }
+
+      if (teamNameTaken) {
+        setError("teamName", {
+          type: "manual",
+          message: "This team name has already been chosen.",
+        });
+        setSubmitError("Team name already exists. Choose another team name.");
         return;
       }
 
@@ -353,8 +478,8 @@ export default function HackathonForm({ qrSrc }: HackathonFormProps) {
       const teamRef = doc(collection(db, "hackathon_registrations"));
       const transactionRef = doc(collection(db, "transactions"));
 
-      const participantIds = membersData.map(() => doc(collection(db, "participants")).id);
-      membersData.forEach((member, index) => {
+      const participantIds = activeMembers.map(() => doc(collection(db, "participants")).id);
+      activeMembers.forEach((member, index) => {
         const participantRef = doc(db, "participants", participantIds[index]);
         batch.set(participantRef, {
           participant_id: participantRef.id,
@@ -368,7 +493,9 @@ export default function HackathonForm({ qrSrc }: HackathonFormProps) {
       batch.set(teamRef, {
         team_id: teamRef.id,
         team_name: values.teamName.trim(),
+        team_name_normalized: normalizedTeamName,
         college: values.college.trim(),
+        state: values.state.trim(),
         team_size: values.teamSize,
         member_ids: participantIds,
         transaction_id: transactionRef.id,
@@ -406,6 +533,7 @@ export default function HackathonForm({ qrSrc }: HackathonFormProps) {
       reset({
         teamName: "",
         college: "",
+        state: "",
         teamSize: 3,
         members: [
           createEmptyMember(),
@@ -445,6 +573,7 @@ export default function HackathonForm({ qrSrc }: HackathonFormProps) {
         "members.3.phone",
         "members.3.rollNumber",
         "members.3.department",
+        "members.3.branchOther",
         "members.3.yearOfStudy",
       ]);
     }
@@ -454,6 +583,183 @@ export default function HackathonForm({ qrSrc }: HackathonFormProps) {
   };
 
   const runSubmit = handleSubmit(onSubmit);
+
+  const renderMemberCard = (index: number, optional = false) => {
+    const isLeader = index === 0;
+    const branchSelection = watchedMembers?.[index]?.department;
+
+    return (
+      <motion.div
+        key={`member-${index + 1}`}
+        layout
+        initial={optional ? { opacity: 0, y: 10 } : false}
+        animate={optional ? { opacity: 1, y: 0 } : undefined}
+        exit={optional ? { opacity: 0, y: 10 } : undefined}
+        transition={{ duration: 0.25 }}
+        className="overflow-hidden rounded-2xl border border-[rgba(141,54,213,0.14)]"
+      >
+        <div className="flex items-center gap-2.5 border-b border-[rgba(141,54,213,0.1)] bg-[rgba(141,54,213,0.1)] px-4 py-3">
+          <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-[linear-gradient(135deg,#46067A,#8D36D5)] font-[var(--font-dm-mono)] text-[10px] font-medium text-white shadow-[0_0_10px_rgba(141,54,213,0.5)]">
+            {String(index + 1).padStart(2, "0")}
+          </div>
+          <p className="font-[var(--font-syne)] text-[11px] font-bold uppercase tracking-[0.1em] text-[#EDE8F5]">
+            Member {index + 1}
+          </p>
+          {isLeader ? (
+            <span className="ml-auto rounded-full bg-[rgba(141,54,213,0.15)] px-2 py-0.5 font-[var(--font-dm-mono)] text-[9px] uppercase tracking-[0.08em] text-[#8D36D5]">
+              Leader
+            </span>
+          ) : null}
+          {optional ? (
+            <span className="ml-auto rounded-full bg-[rgba(141,54,213,0.15)] px-2 py-0.5 font-[var(--font-dm-mono)] text-[9px] uppercase tracking-[0.08em] text-[#8D36D5]">
+              Optional
+            </span>
+          ) : null}
+        </div>
+
+        <div className="flex flex-col gap-4 p-4">
+          <div>
+            <label className="mb-[7px] block font-[var(--font-dm-mono)] text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(237,232,245,0.45)]">
+              Name
+            </label>
+            <input
+              type="text"
+              placeholder="Member name"
+              className="w-full rounded-xl border border-[rgba(141,54,213,0.2)] bg-[rgba(141,54,213,0.06)] px-4 py-[13px] font-[var(--font-dm-sans)] text-sm text-[#EDE8F5] outline-none transition-all duration-300 placeholder:text-[rgba(237,232,245,0.25)] hover:border-[rgba(141,54,213,0.4)] hover:bg-[rgba(141,54,213,0.09)] focus:border-[#8D36D5] focus:bg-[rgba(141,54,213,0.12)] focus:shadow-[0_0_0_3px_rgba(141,54,213,0.15),inset_0_0_0_1px_rgba(141,54,213,0.1)]"
+              {...register(`members.${index}.name` as const, {
+                onChange: () => clearErrors(`members.${index}.name` as const),
+              })}
+            />
+            <AnimatedFieldError message={errors.members?.[index]?.name?.message} />
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-[7px] block font-[var(--font-dm-mono)] text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(237,232,245,0.45)]">
+                Email
+              </label>
+              <input
+                type="email"
+                placeholder="member@example.com"
+                className="w-full rounded-xl border border-[rgba(141,54,213,0.2)] bg-[rgba(141,54,213,0.06)] px-4 py-[13px] font-[var(--font-dm-sans)] text-sm text-[#EDE8F5] outline-none transition-all duration-300 placeholder:text-[rgba(237,232,245,0.25)] hover:border-[rgba(141,54,213,0.4)] hover:bg-[rgba(141,54,213,0.09)] focus:border-[#8D36D5] focus:bg-[rgba(141,54,213,0.12)] focus:shadow-[0_0_0_3px_rgba(141,54,213,0.15),inset_0_0_0_1px_rgba(141,54,213,0.1)]"
+                {...register(`members.${index}.email` as const, {
+                  onChange: () => {
+                    clearErrors(`members.${index}.email` as const);
+                    setSubmitError("");
+                  },
+                })}
+              />
+              <AnimatedFieldError message={errors.members?.[index]?.email?.message} />
+            </div>
+            <div>
+              <label className="mb-[7px] block font-[var(--font-dm-mono)] text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(237,232,245,0.45)]">
+                Phone
+              </label>
+              <input
+                type="tel"
+                placeholder="10-digit mobile"
+                className="w-full rounded-xl border border-[rgba(141,54,213,0.2)] bg-[rgba(141,54,213,0.06)] px-4 py-[13px] font-[var(--font-dm-sans)] text-sm text-[#EDE8F5] outline-none transition-all duration-300 placeholder:text-[rgba(237,232,245,0.25)] hover:border-[rgba(141,54,213,0.4)] hover:bg-[rgba(141,54,213,0.09)] focus:border-[#8D36D5] focus:bg-[rgba(141,54,213,0.12)] focus:shadow-[0_0_0_3px_rgba(141,54,213,0.15),inset_0_0_0_1px_rgba(141,54,213,0.1)]"
+                {...register(`members.${index}.phone` as const, {
+                  onChange: () => {
+                    clearErrors(`members.${index}.phone` as const);
+                    setSubmitError("");
+                  },
+                })}
+              />
+              <AnimatedFieldError message={errors.members?.[index]?.phone?.message} />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-[7px] block font-[var(--font-dm-mono)] text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(237,232,245,0.45)]">
+                Roll Number
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. 21BCE0001"
+                className="w-full rounded-xl border border-[rgba(141,54,213,0.2)] bg-[rgba(141,54,213,0.06)] px-4 py-[13px] font-[var(--font-dm-sans)] text-sm text-[#EDE8F5] outline-none transition-all duration-300 placeholder:text-[rgba(237,232,245,0.25)] hover:border-[rgba(141,54,213,0.4)] hover:bg-[rgba(141,54,213,0.09)] focus:border-[#8D36D5] focus:bg-[rgba(141,54,213,0.12)] focus:shadow-[0_0_0_3px_rgba(141,54,213,0.15),inset_0_0_0_1px_rgba(141,54,213,0.1)]"
+                {...register(`members.${index}.rollNumber` as const, {
+                  onChange: () => clearErrors(`members.${index}.rollNumber` as const),
+                })}
+              />
+              <AnimatedFieldError message={errors.members?.[index]?.rollNumber?.message} />
+            </div>
+
+            <div>
+              <label className="mb-[7px] block font-[var(--font-dm-mono)] text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(237,232,245,0.45)]">
+                Branch
+              </label>
+              <Controller
+                control={control}
+                name={`members.${index}.department` as const}
+                render={({ field }) => (
+                  <CyberDropdown
+                    value={field.value || ""}
+                    options={BRANCH_OPTIONS_WITH_OTHER}
+                    placeholder="Select branch"
+                    onChange={(nextValue) => {
+                      field.onChange(nextValue);
+                      clearErrors(`members.${index}.department` as const);
+
+                      if (nextValue !== OTHER_BRANCH_OPTION) {
+                        setValue(`members.${index}.branchOther` as const, "", {
+                          shouldDirty: true,
+                          shouldTouch: true,
+                          shouldValidate: true,
+                        });
+                        clearErrors(`members.${index}.branchOther` as const);
+                      }
+                    }}
+                  />
+                )}
+              />
+              <AnimatedFieldError message={errors.members?.[index]?.department?.message} />
+            </div>
+          </div>
+
+          {branchSelection === OTHER_BRANCH_OPTION ? (
+            <div>
+              <label className="mb-[7px] block font-[var(--font-dm-mono)] text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(237,232,245,0.45)]">
+                Enter Branch
+              </label>
+              <input
+                type="text"
+                placeholder="Type branch name"
+                className="w-full rounded-xl border border-[rgba(141,54,213,0.2)] bg-[rgba(141,54,213,0.06)] px-4 py-[13px] font-[var(--font-dm-sans)] text-sm text-[#EDE8F5] outline-none transition-all duration-300 placeholder:text-[rgba(237,232,245,0.25)] hover:border-[rgba(141,54,213,0.4)] hover:bg-[rgba(141,54,213,0.09)] focus:border-[#8D36D5] focus:bg-[rgba(141,54,213,0.12)] focus:shadow-[0_0_0_3px_rgba(141,54,213,0.15),inset_0_0_0_1px_rgba(141,54,213,0.1)]"
+                {...register(`members.${index}.branchOther` as const, {
+                  onChange: () => clearErrors(`members.${index}.branchOther` as const),
+                })}
+              />
+              <AnimatedFieldError message={errors.members?.[index]?.branchOther?.message} />
+            </div>
+          ) : null}
+
+          <div>
+            <label className="mb-[7px] block font-[var(--font-dm-mono)] text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(237,232,245,0.45)]">
+              Year
+            </label>
+            <Controller
+              control={control}
+              name={`members.${index}.yearOfStudy` as const}
+              render={({ field }) => (
+                <CyberDropdown
+                  value={field.value || ""}
+                  options={YEAR_OPTIONS}
+                  placeholder="Select year"
+                  onChange={(nextValue) => {
+                    field.onChange(nextValue);
+                    clearErrors(`members.${index}.yearOfStudy` as const);
+                  }}
+                />
+              )}
+            />
+            <AnimatedFieldError message={errors.members?.[index]?.yearOfStudy?.message} />
+          </div>
+        </div>
+      </motion.div>
+    );
+  };
 
   return (
     <div role="form" aria-label="Hackathon registration form" className="pb-0">
@@ -468,7 +774,7 @@ export default function HackathonForm({ qrSrc }: HackathonFormProps) {
           </span>
         </div>
 
-        <div className="mb-4 grid grid-cols-2 gap-[14px] max-sm:grid-cols-1">
+        <div className="mb-4 grid grid-cols-1 gap-[14px] sm:grid-cols-2">
           <div>
             <label className="mb-[7px] block font-[var(--font-dm-mono)] text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(237,232,245,0.45)]">
               Team Name
@@ -477,7 +783,12 @@ export default function HackathonForm({ qrSrc }: HackathonFormProps) {
               type="text"
               placeholder="Enter team name"
               className="w-full rounded-xl border border-[rgba(141,54,213,0.2)] bg-[rgba(141,54,213,0.06)] px-4 py-[13px] font-[var(--font-dm-sans)] text-sm text-[#EDE8F5] outline-none transition-all duration-300 placeholder:text-[rgba(237,232,245,0.25)] hover:border-[rgba(141,54,213,0.4)] hover:bg-[rgba(141,54,213,0.09)] focus:border-[#8D36D5] focus:bg-[rgba(141,54,213,0.12)] focus:shadow-[0_0_0_3px_rgba(141,54,213,0.15),inset_0_0_0_1px_rgba(141,54,213,0.1)]"
-              {...register("teamName")}
+              {...register("teamName", {
+                onChange: () => {
+                  clearErrors("teamName");
+                  setSubmitError("");
+                },
+              })}
             />
             <AnimatedFieldError message={errors.teamName?.message} />
           </div>
@@ -493,6 +804,28 @@ export default function HackathonForm({ qrSrc }: HackathonFormProps) {
             />
             <AnimatedFieldError message={errors.college?.message} />
           </div>
+        </div>
+
+        <div className="mb-4">
+          <label className="mb-[7px] block font-[var(--font-dm-mono)] text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(237,232,245,0.45)]">
+            State
+          </label>
+          <Controller
+            control={control}
+            name="state"
+            render={({ field }) => (
+              <CyberDropdown
+                value={field.value || ""}
+                options={INDIA_STATES}
+                placeholder="Select state"
+                onChange={(nextValue) => {
+                  field.onChange(nextValue);
+                  clearErrors("state");
+                }}
+              />
+            )}
+          />
+          <AnimatedFieldError message={errors.state?.message} />
         </div>
 
         <div>
@@ -556,244 +889,10 @@ export default function HackathonForm({ qrSrc }: HackathonFormProps) {
         </div>
 
         <div className="space-y-3.5">
-          {[0, 1, 2].map((index) => (
-            <motion.div
-              key={`member-${index + 1}`}
-              layout
-              className="overflow-hidden rounded-2xl border border-[rgba(141,54,213,0.14)]"
-            >
-              <div className="flex items-center gap-2.5 border-b border-[rgba(141,54,213,0.1)] bg-[rgba(141,54,213,0.1)] px-4 py-3">
-                <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-[linear-gradient(135deg,#46067A,#8D36D5)] font-[var(--font-dm-mono)] text-[10px] font-medium text-white shadow-[0_0_10px_rgba(141,54,213,0.5)]">
-                  {String(index + 1).padStart(2, "0")}
-                </div>
-                <p className="font-[var(--font-syne)] text-[11px] font-bold uppercase tracking-[0.1em] text-[#EDE8F5]">
-                  Member {index + 1}
-                </p>
-                {index === 0 ? (
-                  <span className="ml-auto rounded-full bg-[rgba(141,54,213,0.15)] px-2 py-0.5 font-[var(--font-dm-mono)] text-[9px] uppercase tracking-[0.08em] text-[#8D36D5]">
-                    Leader
-                  </span>
-                ) : null}
-              </div>
-
-              <div className="flex flex-col gap-4 p-4">
-                <div>
-                  <label className="mb-[7px] block font-[var(--font-dm-mono)] text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(237,232,245,0.45)]">
-                    Name
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Member name"
-                    className="w-full rounded-xl border border-[rgba(141,54,213,0.2)] bg-[rgba(141,54,213,0.06)] px-4 py-[13px] font-[var(--font-dm-sans)] text-sm text-[#EDE8F5] outline-none transition-all duration-300 placeholder:text-[rgba(237,232,245,0.25)] hover:border-[rgba(141,54,213,0.4)] hover:bg-[rgba(141,54,213,0.09)] focus:border-[#8D36D5] focus:bg-[rgba(141,54,213,0.12)] focus:shadow-[0_0_0_3px_rgba(141,54,213,0.15),inset_0_0_0_1px_rgba(141,54,213,0.1)]"
-                    {...register(`members.${index}.name` as const)}
-                  />
-                  <AnimatedFieldError message={errors.members?.[index]?.name?.message} />
-                </div>
-                
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div>
-                    <label className="mb-[7px] block font-[var(--font-dm-mono)] text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(237,232,245,0.45)]">
-                      Email
-                    </label>
-                    <input
-                      type="email"
-                      placeholder="member@example.com"
-                      className="w-full rounded-xl border border-[rgba(141,54,213,0.2)] bg-[rgba(141,54,213,0.06)] px-4 py-[13px] font-[var(--font-dm-sans)] text-sm text-[#EDE8F5] outline-none transition-all duration-300 placeholder:text-[rgba(237,232,245,0.25)] hover:border-[rgba(141,54,213,0.4)] hover:bg-[rgba(141,54,213,0.09)] focus:border-[#8D36D5] focus:bg-[rgba(141,54,213,0.12)] focus:shadow-[0_0_0_3px_rgba(141,54,213,0.15),inset_0_0_0_1px_rgba(141,54,213,0.1)]"
-                      {...register(`members.${index}.email` as const)}
-                    />
-                    <AnimatedFieldError message={errors.members?.[index]?.email?.message} />
-                  </div>
-                  <div>
-                    <label className="mb-[7px] block font-[var(--font-dm-mono)] text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(237,232,245,0.45)]">
-                      Phone
-                    </label>
-                    <input
-                      type="tel"
-                      placeholder="10-digit mobile"
-                      className="w-full rounded-xl border border-[rgba(141,54,213,0.2)] bg-[rgba(141,54,213,0.06)] px-4 py-[13px] font-[var(--font-dm-sans)] text-sm text-[#EDE8F5] outline-none transition-all duration-300 placeholder:text-[rgba(237,232,245,0.25)] hover:border-[rgba(141,54,213,0.4)] hover:bg-[rgba(141,54,213,0.09)] focus:border-[#8D36D5] focus:bg-[rgba(141,54,213,0.12)] focus:shadow-[0_0_0_3px_rgba(141,54,213,0.15),inset_0_0_0_1px_rgba(141,54,213,0.1)]"
-                      {...register(`members.${index}.phone` as const)}
-                    />
-                    <AnimatedFieldError message={errors.members?.[index]?.phone?.message} />
-                  </div>
-                </div>
-
-                <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div>
-                    <label className="mb-[7px] block font-[var(--font-dm-mono)] text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(237,232,245,0.45)]">
-                      Roll Number
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. 21BCE0001"
-                      className="w-full rounded-xl border border-[rgba(141,54,213,0.2)] bg-[rgba(141,54,213,0.06)] px-4 py-[13px] font-[var(--font-dm-sans)] text-sm text-[#EDE8F5] outline-none transition-all duration-300 placeholder:text-[rgba(237,232,245,0.25)] hover:border-[rgba(141,54,213,0.4)] hover:bg-[rgba(141,54,213,0.09)] focus:border-[#8D36D5] focus:bg-[rgba(141,54,213,0.12)] focus:shadow-[0_0_0_3px_rgba(141,54,213,0.15),inset_0_0_0_1px_rgba(141,54,213,0.1)]"
-                      {...register(`members.${index}.rollNumber` as const)}
-                    />
-                    <AnimatedFieldError message={errors.members?.[index]?.rollNumber?.message} />
-                  </div>
-                  <div>
-                    <label className="mb-[7px] block font-[var(--font-dm-mono)] text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(237,232,245,0.45)]">
-                      Branch
-                    </label>
-                    <select
-                      className="w-full appearance-none rounded-xl border border-[rgba(141,54,213,0.2)] bg-[rgba(141,54,213,0.06)] px-4 py-[13px] font-[var(--font-dm-sans)] text-sm text-[#EDE8F5] outline-none transition-all duration-300 hover:border-[rgba(141,54,213,0.4)] hover:bg-[rgba(141,54,213,0.09)] focus:border-[#8D36D5] focus:bg-[rgba(141,54,213,0.12)] focus:shadow-[0_0_0_3px_rgba(141,54,213,0.15),inset_0_0_0_1px_rgba(141,54,213,0.1)]"
-                      {...register(`members.${index}.department` as const)}
-                    >
-                      <option value="" className="bg-[#1A1031] text-[#EDE8F5]">
-                        Select branch
-                      </option>
-                      {BRANCH_OPTIONS.map((branch) => (
-                        <option key={branch} value={branch} className="bg-[#1A1031] text-[#EDE8F5]">
-                          {branch}
-                        </option>
-                      ))}
-                    </select>
-                    <AnimatedFieldError message={errors.members?.[index]?.department?.message} />
-                  </div>
-                </div>
-
-                <div className="mb-3">
-                  <label className="mb-[7px] block font-[var(--font-dm-mono)] text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(237,232,245,0.45)]">
-                    Year
-                  </label>
-                  <select
-                    className="w-full appearance-none rounded-xl border border-[rgba(141,54,213,0.2)] bg-[rgba(141,54,213,0.06)] px-4 py-[13px] font-[var(--font-dm-sans)] text-sm text-[#EDE8F5] outline-none transition-all duration-300 hover:border-[rgba(141,54,213,0.4)] hover:bg-[rgba(141,54,213,0.09)] focus:border-[#8D36D5] focus:bg-[rgba(141,54,213,0.12)] focus:shadow-[0_0_0_3px_rgba(141,54,213,0.15),inset_0_0_0_1px_rgba(141,54,213,0.1)]"
-                    {...register(`members.${index}.yearOfStudy` as const)}
-                  >
-                    <option value="" className="bg-[#1A1031] text-[#EDE8F5]">
-                      Select year
-                    </option>
-                    {YEAR_OPTIONS.map((year) => (
-                      <option key={year} value={year} className="bg-[#1A1031] text-[#EDE8F5]">
-                        {year}
-                      </option>
-                    ))}
-                  </select>
-                  <AnimatedFieldError message={errors.members?.[index]?.yearOfStudy?.message} />
-                </div>
-              </div>
-            </motion.div>
-          ))}
+          {[0, 1, 2].map((index) => renderMemberCard(index))}
 
           <AnimatePresence initial={false}>
-            {teamSize === 4 ? (
-              <motion.div
-                key="member-4"
-                layout
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 10 }}
-                transition={{ duration: 0.25 }}
-                className="overflow-hidden rounded-2xl border border-[rgba(141,54,213,0.14)]"
-              >
-                <div className="flex items-center gap-2.5 border-b border-[rgba(141,54,213,0.1)] bg-[rgba(141,54,213,0.1)] px-4 py-3">
-                  <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-[linear-gradient(135deg,#46067A,#8D36D5)] font-[var(--font-dm-mono)] text-[10px] font-medium text-white shadow-[0_0_10px_rgba(141,54,213,0.5)]">
-                    04
-                  </div>
-                  <p className="font-[var(--font-syne)] text-[11px] font-bold uppercase tracking-[0.1em] text-[#EDE8F5]">
-                    Member 4
-                  </p>
-                  <span className="ml-auto rounded-full bg-[rgba(141,54,213,0.15)] px-2 py-0.5 font-[var(--font-dm-mono)] text-[9px] uppercase tracking-[0.08em] text-[#8D36D5]">
-                    Optional
-                  </span>
-                </div>
-
-              <div className="flex flex-col gap-4 p-4">
-                <div>
-                  <label className="mb-[7px] block font-[var(--font-dm-mono)] text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(237,232,245,0.45)]">
-                    Name
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Member name"
-                    className="w-full rounded-xl border border-[rgba(141,54,213,0.2)] bg-[rgba(141,54,213,0.06)] px-4 py-[13px] font-[var(--font-dm-sans)] text-sm text-[#EDE8F5] outline-none transition-all duration-300 placeholder:text-[rgba(237,232,245,0.25)] hover:border-[rgba(141,54,213,0.4)] hover:bg-[rgba(141,54,213,0.09)] focus:border-[#8D36D5] focus:bg-[rgba(141,54,213,0.12)] focus:shadow-[0_0_0_3px_rgba(141,54,213,0.15),inset_0_0_0_1px_rgba(141,54,213,0.1)]"
-                    {...register("members.3.name")}
-                  />
-                  <AnimatedFieldError message={errors.members?.[3]?.name?.message} />
-                </div>
-
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div>
-                    <label className="mb-[7px] block font-[var(--font-dm-mono)] text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(237,232,245,0.45)]">
-                      Email
-                    </label>
-                    <input
-                      type="email"
-                      placeholder="member@example.com"
-                      className="w-full rounded-xl border border-[rgba(141,54,213,0.2)] bg-[rgba(141,54,213,0.06)] px-4 py-[13px] font-[var(--font-dm-sans)] text-sm text-[#EDE8F5] outline-none transition-all duration-300 placeholder:text-[rgba(237,232,245,0.25)] hover:border-[rgba(141,54,213,0.4)] hover:bg-[rgba(141,54,213,0.09)] focus:border-[#8D36D5] focus:bg-[rgba(141,54,213,0.12)] focus:shadow-[0_0_0_3px_rgba(141,54,213,0.15),inset_0_0_0_1px_rgba(141,54,213,0.1)]"
-                      {...register("members.3.email")}
-                    />
-                    <AnimatedFieldError message={errors.members?.[3]?.email?.message} />
-                  </div>
-                  <div>
-                    <label className="mb-[7px] block font-[var(--font-dm-mono)] text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(237,232,245,0.45)]">
-                      Phone
-                    </label>
-                    <input
-                      type="tel"
-                      placeholder="10-digit mobile"
-                      className="w-full rounded-xl border border-[rgba(141,54,213,0.2)] bg-[rgba(141,54,213,0.06)] px-4 py-[13px] font-[var(--font-dm-sans)] text-sm text-[#EDE8F5] outline-none transition-all duration-300 placeholder:text-[rgba(237,232,245,0.25)] hover:border-[rgba(141,54,213,0.4)] hover:bg-[rgba(141,54,213,0.09)] focus:border-[#8D36D5] focus:bg-[rgba(141,54,213,0.12)] focus:shadow-[0_0_0_3px_rgba(141,54,213,0.15),inset_0_0_0_1px_rgba(141,54,213,0.1)]"
-                      {...register("members.3.phone")}
-                    />
-                    <AnimatedFieldError message={errors.members?.[3]?.phone?.message} />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div>
-                    <label className="mb-[7px] block font-[var(--font-dm-mono)] text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(237,232,245,0.45)]">
-                      Roll Number
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. 21BCE0001"
-                      className="w-full rounded-xl border border-[rgba(141,54,213,0.2)] bg-[rgba(141,54,213,0.06)] px-4 py-[13px] font-[var(--font-dm-sans)] text-sm text-[#EDE8F5] outline-none transition-all duration-300 placeholder:text-[rgba(237,232,245,0.25)] hover:border-[rgba(141,54,213,0.4)] hover:bg-[rgba(141,54,213,0.09)] focus:border-[#8D36D5] focus:bg-[rgba(141,54,213,0.12)] focus:shadow-[0_0_0_3px_rgba(141,54,213,0.15),inset_0_0_0_1px_rgba(141,54,213,0.1)]"
-                      {...register("members.3.rollNumber")}
-                    />
-                    <AnimatedFieldError message={errors.members?.[3]?.rollNumber?.message} />
-                  </div>
-                  <div>
-                    <label className="mb-[7px] block font-[var(--font-dm-mono)] text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(237,232,245,0.45)]">
-                      Branch
-                    </label>
-                    <select
-                      className="w-full appearance-none rounded-xl border border-[rgba(141,54,213,0.2)] bg-[rgba(141,54,213,0.06)] px-4 py-[13px] font-[var(--font-dm-sans)] text-sm text-[#EDE8F5] outline-none transition-all duration-300 hover:border-[rgba(141,54,213,0.4)] hover:bg-[rgba(141,54,213,0.09)] focus:border-[#8D36D5] focus:bg-[rgba(141,54,213,0.12)] focus:shadow-[0_0_0_3px_rgba(141,54,213,0.15),inset_0_0_0_1px_rgba(141,54,213,0.1)]"
-                      {...register("members.3.department")}
-                    >
-                      <option value="" className="bg-[#1A1031] text-[#EDE8F5]">
-                        Select branch
-                      </option>
-                      {BRANCH_OPTIONS.map((branch) => (
-                        <option key={branch} value={branch} className="bg-[#1A1031] text-[#EDE8F5]">
-                          {branch}
-                        </option>
-                      ))}
-                    </select>
-                    <AnimatedFieldError message={errors.members?.[3]?.department?.message} />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="mb-[7px] block font-[var(--font-dm-mono)] text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(237,232,245,0.45)]">
-                    Year
-                  </label>
-                  <select
-                    className="w-full appearance-none rounded-xl border border-[rgba(141,54,213,0.2)] bg-[rgba(141,54,213,0.06)] px-4 py-[13px] font-[var(--font-dm-sans)] text-sm text-[#EDE8F5] outline-none transition-all duration-300 hover:border-[rgba(141,54,213,0.4)] hover:bg-[rgba(141,54,213,0.09)] focus:border-[#8D36D5] focus:bg-[rgba(141,54,213,0.12)] focus:shadow-[0_0_0_3px_rgba(141,54,213,0.15),inset_0_0_0_1px_rgba(141,54,213,0.1)]"
-                    {...register("members.3.yearOfStudy")}
-                  >
-                    <option value="" className="bg-[#1A1031] text-[#EDE8F5]">
-                      Select year
-                    </option>
-                    {YEAR_OPTIONS.map((year) => (
-                      <option key={year} value={year} className="bg-[#1A1031] text-[#EDE8F5]">
-                        {year}
-                      </option>
-                    ))}
-                  </select>
-                  <AnimatedFieldError message={errors.members?.[3]?.yearOfStudy?.message} />
-                </div>
-              </div>
-              </motion.div>
-            ) : null}
+            {teamSize === 4 ? renderMemberCard(3, true) : null}
           </AnimatePresence>
         </div>
       </div>

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -10,6 +10,7 @@ import {
   doc,
   getDocs,
   increment,
+  limit,
   query,
   serverTimestamp,
   where,
@@ -17,56 +18,70 @@ import {
 } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
 import { db, storage } from "../../../lib/firebase";
+import CyberDropdown from "./CyberDropdown";
 import PaymentSection from "./PaymentSection";
+import {
+  BRANCH_OPTIONS,
+  BRANCH_OPTIONS_WITH_OTHER,
+  INDIA_STATES,
+  OTHER_BRANCH_OPTION,
+  YEAR_OPTIONS,
+} from "./registrationOptions";
 import SubmitButton from "./SubmitButton";
 
-const YEAR_OPTIONS = ["1st year", "2nd year", "3rd year", "4th year"] as const;
-const BRANCH_OPTIONS = [
-  "CSE",
-  "AIDS",
-  "IOT",
-  "CSM",
-  "IT",
-  "BIO",
-  "CHEM",
-  "MECH",
-  "ECE",
-  "EVL",
-  "EEE",
-  "CIVIL",
-] as const;
+const workshopSchema = z
+  .object({
+    fullName: z.string().trim().min(1, "Full Name is required."),
+    email: z
+      .string()
+      .trim()
+      .min(1, "Email is required.")
+      .email("Enter a valid email address."),
+    phone: z
+      .string()
+      .trim()
+      .regex(/^\d{10}$/, "Phone must be exactly 10 digits."),
+    college: z.string().trim().min(1, "College / University is required."),
+    state: z.string().trim().min(1, "State is required."),
+    rollNumber: z.string().trim().min(1, "Roll Number is required."),
+    department: z.string().trim().min(1, "Branch is required."),
+    branchOther: z.string().trim().optional(),
+    yearOfStudy: z.string().trim().min(1, "Year is required."),
+    transactionId: z.string().trim().min(1, "Transaction ID is required."),
+  })
+  .superRefine((data, context) => {
+    if (!INDIA_STATES.includes(data.state as (typeof INDIA_STATES)[number])) {
+      context.addIssue({
+        code: "custom",
+        message: "Select a valid state.",
+        path: ["state"],
+      });
+    }
 
-const workshopSchema = z.object({
-  fullName: z.string().trim().min(1, "Full Name is required."),
-  email: z
-    .string()
-    .trim()
-    .min(1, "Email is required.")
-    .email("Enter a valid email address."),
-  phone: z
-    .string()
-    .trim()
-    .regex(/^\d{10}$/, "Phone must be exactly 10 digits."),
-  college: z.string().trim().min(1, "College / University is required."),
-  rollNumber: z.string().trim().min(1, "Roll Number is required."),
-  department: z
-    .string()
-    .trim()
-    .min(1, "Branch is required.")
-    .refine(
-      (value) => BRANCH_OPTIONS.includes(value as (typeof BRANCH_OPTIONS)[number]),
-      "Select a valid branch."
-    ),
-  yearOfStudy: z
-    .string()
-    .trim()
-    .min(1, "Year is required.")
-    .refine(
-      (value) => YEAR_OPTIONS.includes(value as (typeof YEAR_OPTIONS)[number]),
-      "Select a valid year."
-    ),
-  transactionId: z.string().trim().min(1, "Transaction ID is required."),
-});
+    if (data.department === OTHER_BRANCH_OPTION) {
+      if (!String(data.branchOther || "").trim()) {
+        context.addIssue({
+          code: "custom",
+          message: "Please enter your branch name.",
+          path: ["branchOther"],
+        });
+      }
+    } else if (!BRANCH_OPTIONS.includes(data.department as (typeof BRANCH_OPTIONS)[number])) {
+      context.addIssue({
+        code: "custom",
+        message: "Select a valid branch.",
+        path: ["department"],
+      });
+    }
+
+    if (!YEAR_OPTIONS.includes(data.yearOfStudy as (typeof YEAR_OPTIONS)[number])) {
+      context.addIssue({
+        code: "custom",
+        message: "Select a valid year.",
+        path: ["yearOfStudy"],
+      });
+    }
+  });
 
 type WorkshopFormValues = z.infer<typeof workshopSchema>;
 
@@ -129,6 +144,11 @@ function AnimatedNotice({
 export default function WorkshopForm({ qrSrc }: WorkshopFormProps) {
   const {
     register,
+    control,
+    setValue,
+    setError,
+    clearErrors,
+    watch,
     handleSubmit,
     formState: { errors },
     reset,
@@ -140,12 +160,16 @@ export default function WorkshopForm({ qrSrc }: WorkshopFormProps) {
       email: "",
       phone: "",
       college: "",
+      state: "",
       rollNumber: "",
       department: "",
+      branchOther: "",
       yearOfStudy: "",
       transactionId: "",
     },
   });
+
+  const selectedBranch = watch("department");
 
   const [isUploading, setIsUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -219,17 +243,50 @@ export default function WorkshopForm({ qrSrc }: WorkshopFormProps) {
     setIsSubmitting(true);
 
     try {
-      const existingParticipants = await getDocs(
-        query(collection(db, "participants"), where("email", "==", values.email.trim().toLowerCase()))
-      );
-      const workshopDuplicate = existingParticipants.docs.some(
-        (participantDoc) => participantDoc.data().registration_type === "workshop"
-      );
+      const normalizedEmail = values.email.trim().toLowerCase();
+      const normalizedPhone = values.phone.trim();
 
-      if (workshopDuplicate) {
-        setSubmitError("Email already registered for workshop.");
+      const [emailMatches, phoneMatches] = await Promise.all([
+        getDocs(
+          query(
+            collection(db, "participants"),
+            where("email", "==", normalizedEmail),
+            limit(1)
+          )
+        ),
+        getDocs(
+          query(collection(db, "participants"), where("phone", "==", normalizedPhone), limit(1))
+        ),
+      ]);
+
+      let hasDuplicate = false;
+
+      if (!emailMatches.empty) {
+        setError("email", {
+          type: "manual",
+          message: "This email already exists. Please use a different email.",
+        });
+        hasDuplicate = true;
+      }
+
+      if (!phoneMatches.empty) {
+        setError("phone", {
+          type: "manual",
+          message: "This phone number already exists. Please use a different number.",
+        });
+        hasDuplicate = true;
+      }
+
+      if (hasDuplicate) {
+        setSubmitError("Duplicate details found. Resolve highlighted fields before submitting.");
         return;
       }
+
+      const branchValue =
+        values.department === OTHER_BRANCH_OPTION
+          ? String(values.branchOther || "").trim()
+          : values.department.trim();
+      const stateValue = values.state.trim();
 
       const uploadedUrl = await uploadScreenshot(selectedFile);
       if (!uploadedUrl) {
@@ -244,11 +301,13 @@ export default function WorkshopForm({ qrSrc }: WorkshopFormProps) {
       batch.set(participantRef, {
         participant_id: participantRef.id,
         name: values.fullName.trim(),
-        email: values.email.trim().toLowerCase(),
-        phone: values.phone.trim(),
+        email: normalizedEmail,
+        phone: normalizedPhone,
         roll_number: values.rollNumber.trim(),
-        branch: values.department.trim(),
-        department: values.department.trim(),
+        state: stateValue,
+        branch: branchValue,
+        department: branchValue,
+        branch_selection: values.department.trim(),
         year_of_study: values.yearOfStudy.trim(),
         yearOfStudy: values.yearOfStudy.trim(),
         registration_type: "workshop",
@@ -261,9 +320,11 @@ export default function WorkshopForm({ qrSrc }: WorkshopFormProps) {
         participant_id: participantRef.id,
         transaction_id: transactionRef.id,
         college: values.college.trim(),
+        state: stateValue,
         roll_number: values.rollNumber.trim(),
-        branch: values.department.trim(),
-        department: values.department.trim(),
+        branch: branchValue,
+        department: branchValue,
+        branch_selection: values.department.trim(),
         year_of_study: values.yearOfStudy.trim(),
         yearOfStudy: values.yearOfStudy.trim(),
         payment_verified: false,
@@ -350,7 +411,12 @@ export default function WorkshopForm({ qrSrc }: WorkshopFormProps) {
               type="email"
               placeholder="name@example.com"
               className="w-full rounded-xl border border-[rgba(141,54,213,0.2)] bg-[rgba(141,54,213,0.06)] px-4 py-[13px] font-[var(--font-dm-sans)] text-sm text-[#EDE8F5] outline-none transition-all duration-300 placeholder:text-[rgba(237,232,245,0.25)] hover:border-[rgba(141,54,213,0.4)] hover:bg-[rgba(141,54,213,0.09)] focus:border-[#8D36D5] focus:bg-[rgba(141,54,213,0.12)] focus:shadow-[0_0_0_3px_rgba(141,54,213,0.15),inset_0_0_0_1px_rgba(141,54,213,0.1)]"
-              {...register("email")}
+              {...register("email", {
+                onChange: () => {
+                  clearErrors("email");
+                  setSubmitError("");
+                },
+              })}
             />
             <AnimatedFieldError message={errors.email?.message} />
           </div>
@@ -362,7 +428,12 @@ export default function WorkshopForm({ qrSrc }: WorkshopFormProps) {
               type="tel"
               placeholder="10-digit mobile"
               className="w-full rounded-xl border border-[rgba(141,54,213,0.2)] bg-[rgba(141,54,213,0.06)] px-4 py-[13px] font-[var(--font-dm-sans)] text-sm text-[#EDE8F5] outline-none transition-all duration-300 placeholder:text-[rgba(237,232,245,0.25)] hover:border-[rgba(141,54,213,0.4)] hover:bg-[rgba(141,54,213,0.09)] focus:border-[#8D36D5] focus:bg-[rgba(141,54,213,0.12)] focus:shadow-[0_0_0_3px_rgba(141,54,213,0.15),inset_0_0_0_1px_rgba(141,54,213,0.1)]"
-              {...register("phone")}
+              {...register("phone", {
+                onChange: () => {
+                  clearErrors("phone");
+                  setSubmitError("");
+                },
+              })}
             />
             <AnimatedFieldError message={errors.phone?.message} />
           </div>
@@ -384,6 +455,28 @@ export default function WorkshopForm({ qrSrc }: WorkshopFormProps) {
         <div className="mb-5 grid grid-cols-1 gap-5 sm:grid-cols-2">
           <div>
             <label className="mb-[7px] block font-[var(--font-dm-mono)] text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(237,232,245,0.45)]">
+              State
+            </label>
+            <Controller
+              control={control}
+              name="state"
+              render={({ field }) => (
+                <CyberDropdown
+                  value={field.value || ""}
+                  options={INDIA_STATES}
+                  placeholder="Select state"
+                  onChange={(nextValue) => {
+                    field.onChange(nextValue);
+                    clearErrors("state");
+                  }}
+                />
+              )}
+            />
+            <AnimatedFieldError message={errors.state?.message} />
+          </div>
+
+          <div>
+            <label className="mb-[7px] block font-[var(--font-dm-mono)] text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(237,232,245,0.45)]">
               Roll Number
             </label>
             <input
@@ -399,20 +492,48 @@ export default function WorkshopForm({ qrSrc }: WorkshopFormProps) {
             <label className="mb-[7px] block font-[var(--font-dm-mono)] text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(237,232,245,0.45)]">
               Branch
             </label>
-            <select
-              className="w-full appearance-none rounded-xl border border-[rgba(141,54,213,0.2)] bg-[rgba(141,54,213,0.06)] px-4 py-[13px] font-[var(--font-dm-sans)] text-sm text-[#EDE8F5] outline-none transition-all duration-300 hover:border-[rgba(141,54,213,0.4)] hover:bg-[rgba(141,54,213,0.09)] focus:border-[#8D36D5] focus:bg-[rgba(141,54,213,0.12)] focus:shadow-[0_0_0_3px_rgba(141,54,213,0.15),inset_0_0_0_1px_rgba(141,54,213,0.1)]"
-              {...register("department")}
-            >
-              <option value="" className="bg-[#1A1031] text-[#EDE8F5]">
-                Select branch
-              </option>
-              {BRANCH_OPTIONS.map((branch) => (
-                <option key={branch} value={branch} className="bg-[#1A1031] text-[#EDE8F5]">
-                  {branch}
-                </option>
-              ))}
-            </select>
+            <Controller
+              control={control}
+              name="department"
+              render={({ field }) => (
+                <CyberDropdown
+                  value={field.value || ""}
+                  options={BRANCH_OPTIONS_WITH_OTHER}
+                  placeholder="Select branch"
+                  onChange={(nextValue) => {
+                    field.onChange(nextValue);
+                    clearErrors("department");
+
+                    if (nextValue !== OTHER_BRANCH_OPTION) {
+                      setValue("branchOther", "", {
+                        shouldDirty: true,
+                        shouldTouch: true,
+                        shouldValidate: true,
+                      });
+                      clearErrors("branchOther");
+                    }
+                  }}
+                />
+              )}
+            />
             <AnimatedFieldError message={errors.department?.message} />
+
+            {selectedBranch === OTHER_BRANCH_OPTION ? (
+              <div className="mt-3">
+                <label className="mb-[7px] block font-[var(--font-dm-mono)] text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(237,232,245,0.45)]">
+                  Enter Branch
+                </label>
+                <input
+                  type="text"
+                  placeholder="Type your branch"
+                  className="w-full rounded-xl border border-[rgba(141,54,213,0.2)] bg-[rgba(141,54,213,0.06)] px-4 py-[13px] font-[var(--font-dm-sans)] text-sm text-[#EDE8F5] outline-none transition-all duration-300 placeholder:text-[rgba(237,232,245,0.25)] hover:border-[rgba(141,54,213,0.4)] hover:bg-[rgba(141,54,213,0.09)] focus:border-[#8D36D5] focus:bg-[rgba(141,54,213,0.12)] focus:shadow-[0_0_0_3px_rgba(141,54,213,0.15),inset_0_0_0_1px_rgba(141,54,213,0.1)]"
+                  {...register("branchOther", {
+                    onChange: () => clearErrors("branchOther"),
+                  })}
+                />
+                <AnimatedFieldError message={errors.branchOther?.message} />
+              </div>
+            ) : null}
           </div>
         </div>
 
@@ -420,19 +541,21 @@ export default function WorkshopForm({ qrSrc }: WorkshopFormProps) {
           <label className="mb-[7px] block font-[var(--font-dm-mono)] text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(237,232,245,0.45)]">
             Year
           </label>
-          <select
-            className="w-full appearance-none rounded-xl border border-[rgba(141,54,213,0.2)] bg-[rgba(141,54,213,0.06)] px-4 py-[13px] font-[var(--font-dm-sans)] text-sm text-[#EDE8F5] outline-none transition-all duration-300 hover:border-[rgba(141,54,213,0.4)] hover:bg-[rgba(141,54,213,0.09)] focus:border-[#8D36D5] focus:bg-[rgba(141,54,213,0.12)] focus:shadow-[0_0_0_3px_rgba(141,54,213,0.15),inset_0_0_0_1px_rgba(141,54,213,0.1)]"
-            {...register("yearOfStudy")}
-          >
-            <option value="" className="bg-[#1A1031] text-[#EDE8F5]">
-              Select year
-            </option>
-            {YEAR_OPTIONS.map((year) => (
-              <option key={year} value={year} className="bg-[#1A1031] text-[#EDE8F5]">
-                {year}
-              </option>
-            ))}
-          </select>
+          <Controller
+            control={control}
+            name="yearOfStudy"
+            render={({ field }) => (
+              <CyberDropdown
+                value={field.value || ""}
+                options={YEAR_OPTIONS}
+                placeholder="Select year"
+                onChange={(nextValue) => {
+                  field.onChange(nextValue);
+                  clearErrors("yearOfStudy");
+                }}
+              />
+            )}
+          />
           <AnimatedFieldError message={errors.yearOfStudy?.message} />
         </div>
       </div>
