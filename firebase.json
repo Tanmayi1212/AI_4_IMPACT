@@ -1,7 +1,7 @@
 {
   "hosting": {
     "site": "ai4impact",
-    "public": "out",
+    "source": ".",
     "cleanUrls": true,
     "ignore": [
       "firebase.json",

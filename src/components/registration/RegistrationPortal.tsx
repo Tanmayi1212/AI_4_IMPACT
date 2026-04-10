@@ -2,30 +2,11 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { DM_Mono, DM_Sans, Syne } from "next/font/google";
 import Image from "next/image";
 import TrackTabs from "./TrackTabs";
 import WorkshopForm from "./WorkshopForm";
 import HackathonForm from "./HackathonForm";
 import { portalStyles, type RegistrationTrack } from "./styles";
-
-const syne = Syne({
-  subsets: ["latin"],
-  weight: ["400", "600", "700", "800"],
-  variable: "--font-syne",
-});
-
-const dmMono = DM_Mono({
-  subsets: ["latin"],
-  weight: ["300", "400", "500"],
-  variable: "--font-dm-mono",
-});
-
-const dmSans = DM_Sans({
-  subsets: ["latin"],
-  weight: ["300", "400", "500"],
-  variable: "--font-dm-sans",
-});
 
 interface RegistrationPortalProps {
   workshopQrSrc: string;
@@ -40,7 +21,7 @@ export default function RegistrationPortal({
 
   return (
     <div
-      className={`${syne.variable} ${dmMono.variable} ${dmSans.variable} relative min-h-screen overflow-x-hidden bg-[#07020E] font-[var(--font-dm-sans)] text-[#EDE8F5] normal-case`}
+      className="relative min-h-screen overflow-x-hidden bg-[#07020E] font-[var(--font-dm-sans)] text-[#EDE8F5] normal-case"
     >
       <div className="fixed inset-0 z-0 overflow-hidden" style={portalStyles.meshBackground}>
         <div className="absolute inset-0" style={portalStyles.meshGrid} />

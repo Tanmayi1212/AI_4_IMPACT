@@ -20,28 +20,32 @@ function unauthorized(message) {
 
 export async function requireAdmin(request) {
   const authHeader = request.headers.get("authorization") || "";
+  const bearerToken = authHeader.startsWith("Bearer ")
+    ? authHeader.slice(7).trim()
+    : "";
+  const sessionCookieToken = request.cookies?.get?.("admin_session")?.value?.trim?.() || "";
 
-  if (!authHeader.startsWith("Bearer ")) {
+  const candidateTokens = [bearerToken, sessionCookieToken].filter(Boolean);
+
+  if (candidateTokens.length === 0) {
     return { error: unauthorized("Missing or invalid Authorization header.") };
   }
 
-  const idToken = authHeader.slice(7).trim();
-  if (!idToken) {
-    return { error: unauthorized("Missing Firebase ID token.") };
-  }
+  for (const token of candidateTokens) {
+    try {
+      const decodedToken = await adminAuth.verifyIdToken(token);
 
-  try {
-    const decodedToken = await adminAuth.verifyIdToken(idToken);
+      if (decodedToken.admin !== true && !isAllowedAdminEmail(decodedToken.email)) {
+        return {
+          error: NextResponse.json({ error: "Forbidden" }, { status: 403 }),
+        };
+      }
 
-    if (decodedToken.admin !== true && !isAllowedAdminEmail(decodedToken.email)) {
-      return {
-        error: NextResponse.json({ error: "Forbidden" }, { status: 403 }),
-      };
+      return { decodedToken };
+    } catch {
+      // Try next candidate token source.
     }
-
-    return { decodedToken };
-  } catch (error) {
-    console.error("Admin token verification failed:", error);
-    return { error: unauthorized("Invalid or expired Firebase ID token.") };
   }
+
+  return { error: unauthorized("Invalid or expired Firebase ID token.") };
 }

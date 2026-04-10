@@ -3,6 +3,11 @@
 @tailwind utilities;
 
 :root {
+    --font-geist-sans: "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif;
+    --font-geist-mono: "Consolas", "Courier New", monospace;
+    --font-syne: "Franklin Gothic Medium", "Arial Narrow", Arial, sans-serif;
+    --font-dm-mono: "Consolas", "Lucida Console", monospace;
+    --font-dm-sans: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
     --bg-dark: #050505;
     --bg-light: #F4F4F5;
     --neon-pink: #FF00FF;

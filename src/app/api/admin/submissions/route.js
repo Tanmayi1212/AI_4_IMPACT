@@ -3,7 +3,7 @@ import { adminDb } from "../../../../../lib/admin";
 import { verifyRequestWithProfile, isAdmin } from "../../../../../lib/server/auth";
 import { ROLES } from "../../../../../lib/constants/roles";
 
-export const dynamic = "force-static";
+export const dynamic = "force-dynamic";
 
 export async function GET(request) {
   try {
