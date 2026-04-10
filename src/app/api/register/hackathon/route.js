@@ -129,36 +129,6 @@ export async function POST(request) {
       });
     }
 
-    const [exactTeamSnapshot, normalizedTeamSnapshot] = await Promise.all([
-      adminDb
-        .collection("hackathon_registrations")
-        .where("team_name", "==", teamName)
-        .limit(1)
-        .get(),
-      adminDb
-        .collection("hackathon_registrations")
-        .where("team_name_normalized", "==", normalizedTeamName)
-        .limit(1)
-        .get(),
-    ]);
-
-    let teamNameTaken = !exactTeamSnapshot.empty || !normalizedTeamSnapshot.empty;
-    if (!teamNameTaken) {
-      const allTeamsSnapshot = await adminDb.collection("hackathon_registrations").get();
-      teamNameTaken = allTeamsSnapshot.docs.some((teamDoc) => {
-        const teamData = teamDoc.data() || {};
-        const rawTeamName = asTrimmedString(teamData?.team_name_normalized || teamData?.team_name);
-        return normalizeTeamName(rawTeamName) === normalizedTeamName;
-      });
-    }
-
-    if (teamNameTaken) {
-      await cleanupTempScreenshot(screenshotUrl);
-      return conflict("This team name has already been chosen.", {
-        team_name: "This team name has already been chosen.",
-      });
-    }
-
     const memberEmails = normalizedMembers.map((member) => member.email);
     const memberPhones = normalizedMembers.map((member) => member.phone);
 

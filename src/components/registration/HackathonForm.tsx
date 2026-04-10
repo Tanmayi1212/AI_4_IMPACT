@@ -392,9 +392,45 @@ export default function HackathonForm({ qrSrc }: HackathonFormProps) {
         }),
       });
 
-      const data = await response.json().catch(() => ({}));
+      const rawResponseBody = await response.text();
+      const data = (() => {
+        if (!rawResponseBody) {
+          return {} as {
+            success?: boolean;
+            error?: string;
+            field_errors?: {
+              team_name?: string;
+              member_emails?: string[];
+              member_phones?: string[];
+            };
+          };
+        }
+
+        try {
+          return JSON.parse(rawResponseBody) as {
+            success?: boolean;
+            error?: string;
+            field_errors?: {
+              team_name?: string;
+              member_emails?: string[];
+              member_phones?: string[];
+            };
+          };
+        } catch {
+          return {} as {
+            success?: boolean;
+            error?: string;
+            field_errors?: {
+              team_name?: string;
+              member_emails?: string[];
+              member_phones?: string[];
+            };
+          };
+        }
+      })();
+
       if (!response.ok || !data?.success) {
-        const fieldErrors = data?.field_errors || {};
+        const fieldErrors = data.field_errors || {};
 
         if (fieldErrors?.team_name) {
           setError("teamName", {
@@ -434,9 +470,16 @@ export default function HackathonForm({ qrSrc }: HackathonFormProps) {
           });
         }
 
+        const maybeServerError =
+          typeof data?.error === "string"
+            ? data.error
+            : rawResponseBody && !rawResponseBody.trim().startsWith("<!DOCTYPE")
+            ? rawResponseBody.trim().slice(0, 220)
+            : "";
+
         setSubmitError(
-          data?.error ||
-            "Failed to submit hackathon registration. Please verify your details and try again."
+          maybeServerError ||
+            `Failed to submit hackathon registration (HTTP ${response.status}). Please verify your details and try again.`
         );
         return;
       }
