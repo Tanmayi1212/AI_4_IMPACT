@@ -1,10 +1,14 @@
-import { getApps, initializeApp, cert } from "firebase-admin/app";
-import { getAuth } from "firebase-admin/auth";
-import { getFirestore } from "firebase-admin/firestore";
-import { getStorage } from "firebase-admin/storage";
 import fs from "node:fs";
+import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+
+const require = createRequire(import.meta.url);
+
+const { getApps, initializeApp, cert } = require("firebase-admin/app");
+const { getAuth } = require("firebase-admin/auth");
+const { getFirestore, FieldPath, FieldValue, Timestamp } = require("firebase-admin/firestore");
+const { getStorage } = require("firebase-admin/storage");
 
 function normalizePrivateKey(value) {
   return String(value || "").replace(/\\n/g, "\n").trim();
@@ -85,4 +89,4 @@ const adminAuth = getAuth();
 const adminDb = getFirestore();
 const adminStorage = getStorage().bucket(storageBucket);
 
-export { adminAuth, adminDb, adminStorage };
+export { adminAuth, adminDb, adminStorage, FieldPath, FieldValue, Timestamp };
