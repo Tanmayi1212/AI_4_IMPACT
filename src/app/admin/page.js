@@ -4,6 +4,11 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { getUserRole, logoutAdmin, onUserAuthChange } from "../../../lib/auth";
 import { ROLES } from "../../../lib/constants/roles";
+import { db } from "../../../lib/firebase";
+import {
+  loadAdminRegistrationsFromClient,
+  updatePaymentStatusFromClient,
+} from "../../../lib/admin-client";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   BarChart, Bar, PieChart, Pie, Cell, ResponsiveContainer, Legend
@@ -161,6 +166,7 @@ function mapRegistrationItem(item) {
     return {
       id: item?.transaction_id,
       transactionDocId: item?.transaction_id,
+      registrationRefId: item?.registration_ref || registration?.workshop_id || "",
       registrationType,
       teamName: participant?.name || fallbackName,
       collegeName: participant?.college || "",
@@ -217,6 +223,7 @@ function mapRegistrationItem(item) {
   return {
     id: item?.transaction_id,
     transactionDocId: item?.transaction_id,
+    registrationRefId: item?.registration_ref || registration?.team_id || "",
     registrationType: registrationType || "hackathon",
     teamName: registration?.team_name || "",
     collegeName: registration?.college || "",
@@ -262,6 +269,8 @@ export default function AdminDashboard() {
   const [bulkSendBusy, setBulkSendBusy] = useState(false);
   const [bulkActionMessage, setBulkActionMessage] = useState("");
   const [actionError, setActionError] = useState("");
+  const [apiRuntimeAvailable, setApiRuntimeAvailable] = useState(true);
+  const [runtimeNotice, setRuntimeNotice] = useState("");
   const [previewScreenshot, setPreviewScreenshot] = useState({
     url: "",
     label: "PAYMENT SCREENSHOT",
@@ -318,30 +327,65 @@ export default function AdminDashboard() {
   const fetchRegistrations = useCallback(async () => {
     if (!user) return;
 
-    const idToken = await user.getIdToken();
-    const response = await fetch("/api/admin/registrations", {
-      headers: {
-        Authorization: `Bearer ${idToken}`,
-      },
-      cache: "no-store",
-    });
+    const setClientFallbackMode = () => {
+      setApiRuntimeAvailable(false);
+      setRuntimeNotice(
+        "Admin API runtime is unavailable on current hosting mode. Dashboard is using direct Firestore mode. Credential generation/email actions require localhost server runtime."
+      );
+    };
 
-    const data = await response.json().catch(() => ({}));
+    try {
+      const idToken = await user.getIdToken();
+      const response = await fetch("/api/admin/registrations", {
+        headers: {
+          Authorization: `Bearer ${idToken}`,
+        },
+        cache: "no-store",
+      });
 
-    if (!response.ok) {
-      if (response.status === 403) {
-        throw new Error("Admin custom claim is missing. Please set { admin: true } for this user.");
+      const data = await response.json().catch(() => ({}));
+
+      if (response.ok) {
+        const mapped = Array.isArray(data?.registrations)
+          ? data.registrations.map((item) => mapRegistrationItem(item))
+          : [];
+
+        setRegistrations(mapped);
+        setDataError("");
+        setApiRuntimeAvailable(true);
+        setRuntimeNotice("");
+        return;
       }
 
-      throw new Error(data?.error || "Failed to sync dashboard data.");
+      if (response.status !== 404 && response.status !== 405) {
+        if (response.status === 403) {
+          throw new Error(
+            "Admin access denied. Ensure this account has admin claim or users/{uid}.role=ADMIN."
+          );
+        }
+
+        throw new Error(data?.error || "Failed to sync dashboard data.");
+      }
+    } catch (apiError) {
+      // Fall through to Firestore client mode.
+      if (apiError?.message && !String(apiError.message).includes("Failed to fetch")) {
+        setDataError(apiError.message);
+      }
     }
 
-    const mapped = Array.isArray(data?.registrations)
-      ? data.registrations.map((item) => mapRegistrationItem(item))
-      : [];
+    try {
+      const fallbackData = await loadAdminRegistrationsFromClient(db);
+      const mappedFallback = fallbackData.map((item) => mapRegistrationItem(item));
 
-    setRegistrations(mapped);
-    setDataError("");
+      setRegistrations(mappedFallback);
+      setDataError("");
+      setClientFallbackMode();
+    } catch (clientError) {
+      throw new Error(
+        clientError?.message ||
+          "Failed to sync dashboard data in Firestore fallback mode. Check admin auth and rules."
+      );
+    }
   }, [user]);
 
   // ── Admin API sync ──
@@ -619,77 +663,143 @@ export default function AdminDashboard() {
     setActionError("");
 
     try {
-      const idToken = await user.getIdToken();
-      const response = await fetch("/api/admin/verify-payment", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${idToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          transaction_id: selectedTeam.transactionDocId || selectedTeam.id,
-          action,
-        }),
-      });
+      let updatedViaApi = false;
 
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok || !data?.success) {
-        throw new Error(data?.error || "Failed to update status.");
+      if (apiRuntimeAvailable) {
+        const idToken = await user.getIdToken();
+        const response = await fetch("/api/admin/verify-payment", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${idToken}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            transaction_id: selectedTeam.transactionDocId || selectedTeam.id,
+            action,
+          }),
+        });
+
+        const data = await response.json().catch(() => ({}));
+
+        if (response.ok && data?.success) {
+          const nextAccessCredentials = data?.access_credentials
+            ? {
+                teamId: data.access_credentials.team_id || "",
+                password: data.access_credentials.password || "",
+                passwordVersion: Number(data.access_credentials.password_version || 0),
+                leaderName: data.access_credentials.leader_name || "",
+                leaderEmail: data.access_credentials.leader_email || "",
+                leaderPhone: data.access_credentials.leader_phone || "",
+              }
+            : null;
+
+          const nextEmailDelivery =
+            newStatus === "verified" && nextAccessCredentials
+              ? toEmailDelivery({
+                  state: "UNSENT",
+                  can_send: true,
+                  recipient: nextAccessCredentials.leaderEmail,
+                })
+              : toEmailDelivery({ state: "NOT_READY", can_send: false });
+
+          setRegistrations((prev) =>
+            prev.map((item) =>
+              item.id === selectedTeam.id
+                ? {
+                    ...item,
+                    status: newStatus,
+                    notes: nextNotes,
+                    accessCredentials: nextAccessCredentials || item.accessCredentials,
+                    emailDelivery: nextEmailDelivery,
+                  }
+                : item
+            )
+          );
+          setSelectedTeam((prev) => (
+            prev
+              ? {
+                  ...prev,
+                  status: newStatus,
+                  notes: nextNotes,
+                  accessCredentials: nextAccessCredentials || prev.accessCredentials,
+                  emailDelivery: nextEmailDelivery,
+                }
+              : prev
+          ));
+          setNoteText(nextNotes);
+          updatedViaApi = true;
+          setApiRuntimeAvailable(true);
+          setRuntimeNotice("");
+        } else if (response.status === 404 || response.status === 405) {
+          setApiRuntimeAvailable(false);
+          setRuntimeNotice(
+            "Admin API runtime is unavailable on current hosting mode. Dashboard is using direct Firestore mode. Credential generation/email actions require localhost server runtime."
+          );
+        } else {
+          throw new Error(data?.error || "Failed to update status.");
+        }
       }
 
-      const nextAccessCredentials = data?.access_credentials
-        ? {
-            teamId: data.access_credentials.team_id || "",
-            password: data.access_credentials.password || "",
-            passwordVersion: Number(data.access_credentials.password_version || 0),
-            leaderName: data.access_credentials.leader_name || "",
-            leaderEmail: data.access_credentials.leader_email || "",
-            leaderPhone: data.access_credentials.leader_phone || "",
-          }
-        : null;
-      const nextEmailDelivery =
-        newStatus === "verified" && nextAccessCredentials
-          ? toEmailDelivery({
-              state: "UNSENT",
-              can_send: true,
-              recipient: nextAccessCredentials.leaderEmail,
-            })
-          : toEmailDelivery({ state: "NOT_READY", can_send: false });
+      if (!updatedViaApi) {
+        await updatePaymentStatusFromClient(db, {
+          transactionId: selectedTeam.transactionDocId || selectedTeam.id,
+          registrationType: selectedTeam.registrationType,
+          registrationRefId: selectedTeam.registrationRefId,
+          status: newStatus,
+          verifierUid: user.uid,
+        });
 
-      setRegistrations((prev) =>
-        prev.map((item) =>
-          item.id === selectedTeam.id
+        const fallbackEmailDelivery =
+          selectedTeam.registrationType === "hackathon"
+            ? newStatus === "verified" && selectedTeam?.accessCredentials?.leaderEmail
+              ? toEmailDelivery({
+                  state: "UNSENT",
+                  can_send: true,
+                  recipient: selectedTeam.accessCredentials.leaderEmail,
+                })
+              : toEmailDelivery({ state: "NOT_READY", can_send: false })
+            : selectedTeam.emailDelivery;
+
+        setRegistrations((prev) =>
+          prev.map((item) =>
+            item.id === selectedTeam.id
+              ? {
+                  ...item,
+                  status: newStatus,
+                  notes: nextNotes,
+                  emailDelivery: fallbackEmailDelivery,
+                }
+              : item
+          )
+        );
+        setSelectedTeam((prev) => (
+          prev
             ? {
-                ...item,
+                ...prev,
                 status: newStatus,
                 notes: nextNotes,
-                accessCredentials: nextAccessCredentials || item.accessCredentials,
-                emailDelivery: nextEmailDelivery,
+                emailDelivery: fallbackEmailDelivery,
               }
-            : item
-        )
-      );
-      setSelectedTeam((prev) => (
-        prev
-          ? {
-              ...prev,
-              status: newStatus,
-              notes: nextNotes,
-              accessCredentials: nextAccessCredentials || prev.accessCredentials,
-              emailDelivery: nextEmailDelivery,
-            }
-          : prev
-      ));
-      setNoteText(nextNotes);
+            : prev
+        ));
+        setNoteText(nextNotes);
+      }
     } catch (err) {
       setActionError(err?.message || "Failed to update status.");
     } finally {
       setUpdateBusy(false);
     }
-  }, [selectedTeam, updateBusy, user]);
+  }, [selectedTeam, updateBusy, user, apiRuntimeAvailable]);
 
   const handleRegenerateCredentials = useCallback(async () => {
     if (!selectedTeam || !user || updateBusy) return;
+
+    if (!apiRuntimeAvailable) {
+      setActionError(
+        "Credential generation requires backend API runtime. Use localhost server mode for this action."
+      );
+      return;
+    }
 
     if (selectedTeam.registrationType !== "hackathon") {
       setActionError("Credentials apply only to hackathon teams.");
@@ -718,6 +828,13 @@ export default function AdminDashboard() {
       });
 
       const data = await response.json().catch(() => ({}));
+      if (response.status === 404 || response.status === 405) {
+        setApiRuntimeAvailable(false);
+        setRuntimeNotice(
+          "Admin API runtime is unavailable on current hosting mode. Dashboard is using direct Firestore mode. Credential generation/email actions require localhost server runtime."
+        );
+        throw new Error("Credential generation is unavailable on static hosting mode.");
+      }
       if (!response.ok || !data?.success) {
         throw new Error(data?.error || "Failed to regenerate credentials.");
       }
@@ -766,10 +883,17 @@ export default function AdminDashboard() {
     } finally {
       setUpdateBusy(false);
     }
-  }, [selectedTeam, updateBusy, user]);
+  }, [selectedTeam, updateBusy, user, apiRuntimeAvailable]);
 
   const handleSendCredentialEmail = useCallback(async (targetTeam, { force = false } = {}) => {
     if (!targetTeam || !user) return;
+
+    if (!apiRuntimeAvailable) {
+      setActionError(
+        "Credential email sending requires backend API runtime. Use localhost server mode for this action."
+      );
+      return;
+    }
 
     if (bulkSendBusy) {
       setActionError("Bulk credential email dispatch is running. Please wait.");
@@ -805,6 +929,13 @@ export default function AdminDashboard() {
       });
 
       const data = await response.json().catch(() => ({}));
+      if (response.status === 404 || response.status === 405) {
+        setApiRuntimeAvailable(false);
+        setRuntimeNotice(
+          "Admin API runtime is unavailable on current hosting mode. Dashboard is using direct Firestore mode. Credential generation/email actions require localhost server runtime."
+        );
+        throw new Error("Credential email API is unavailable on static hosting mode.");
+      }
       if (!response.ok || !data?.success) {
         const conflictDelivery = data?.email_delivery
           ? toEmailDelivery({
@@ -866,10 +997,17 @@ export default function AdminDashboard() {
     } finally {
       setEmailActionBusyId("");
     }
-  }, [bulkSendBusy, selectedTeam, user]);
+  }, [bulkSendBusy, selectedTeam, user, apiRuntimeAvailable]);
 
   const handleBulkSendUnsent = useCallback(async () => {
     if (!user || bulkSendBusy) return;
+
+    if (!apiRuntimeAvailable) {
+      setDataError(
+        "Bulk credential email dispatch requires backend API runtime. Use localhost server mode for this action."
+      );
+      return;
+    }
 
     if (bulkSendCandidateIds.length === 0) {
       setBulkActionMessage("No unsent credential emails found in the current filtered view.");
@@ -896,6 +1034,13 @@ export default function AdminDashboard() {
       });
 
       const data = await response.json().catch(() => ({}));
+      if (response.status === 404 || response.status === 405) {
+        setApiRuntimeAvailable(false);
+        setRuntimeNotice(
+          "Admin API runtime is unavailable on current hosting mode. Dashboard is using direct Firestore mode. Credential generation/email actions require localhost server runtime."
+        );
+        throw new Error("Bulk credential email API is unavailable on static hosting mode.");
+      }
       if (!response.ok || !data?.success) {
         throw new Error(data?.error || "Failed to bulk send unsent credential emails.");
       }
@@ -979,7 +1124,7 @@ export default function AdminDashboard() {
     } finally {
       setBulkSendBusy(false);
     }
-  }, [bulkSendBusy, bulkSendCandidateIds, user]);
+  }, [bulkSendBusy, bulkSendCandidateIds, user, apiRuntimeAvailable]);
 
   const handleSaveNotes = useCallback(async () => {
     if (!selectedTeam || updateBusy) return;
@@ -1026,7 +1171,8 @@ export default function AdminDashboard() {
   const selectedEmailMeta = getEmailStateMeta(selectedEmailDelivery);
   const selectedCanSendCredentialEmail =
     canSendCredentialEmailForRegistration(selectedTeam) &&
-    !bulkSendBusy;
+    !bulkSendBusy &&
+    apiRuntimeAvailable;
   const selectedShouldForceResend = selectedEmailMeta.state === "SUCCESS";
 
   const isDupName = (name) => duplicates.dupNames.has(name?.toLowerCase());
@@ -1073,6 +1219,22 @@ export default function AdminDashboard() {
             marginBottom: "1rem"
           }}>
             DATA_SYNC_ERROR: {dataError}
+          </div>
+        )}
+
+        {runtimeNotice && (
+          <div
+            style={{
+              padding: "0.85rem 1rem",
+              border: "1px solid var(--neon-cyan)",
+              background: "rgba(0,255,255,0.06)",
+              color: "var(--neon-cyan)",
+              fontFamily: "monospace",
+              marginBottom: "1rem",
+              fontSize: "0.78rem",
+            }}
+          >
+            RUNTIME_MODE_NOTICE: {runtimeNotice}
           </div>
         )}
 
@@ -1257,12 +1419,12 @@ export default function AdminDashboard() {
                 onClick={() => {
                   void handleBulkSendUnsent();
                 }}
-                disabled={bulkSendBusy || bulkSendCandidateIds.length === 0}
+                disabled={bulkSendBusy || bulkSendCandidateIds.length === 0 || !apiRuntimeAvailable}
                 className="btn"
                 style={{
                   padding: "0.4rem 0.95rem",
                   fontSize: "0.75rem",
-                  opacity: bulkSendBusy || bulkSendCandidateIds.length === 0 ? 0.6 : 1,
+                  opacity: bulkSendBusy || bulkSendCandidateIds.length === 0 || !apiRuntimeAvailable ? 0.6 : 1,
                 }}
               >
                 {bulkSendBusy
@@ -1302,7 +1464,7 @@ export default function AdminDashboard() {
                     const leaderContact = getLeaderContact(r);
                     const emailStateMeta = getEmailStateMeta(r.emailDelivery);
                     const canSendCredentialEmail =
-                      canSendCredentialEmailForRegistration(r) && !bulkSendBusy;
+                      canSendCredentialEmailForRegistration(r) && !bulkSendBusy && apiRuntimeAvailable;
                     const shouldForceResend = emailStateMeta.state === "SUCCESS";
                     const isSendingThisRow = emailActionBusyId === r.id;
                     return (

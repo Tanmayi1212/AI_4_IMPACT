@@ -13,6 +13,7 @@ import {
   limit,
   query,
   serverTimestamp,
+  updateDoc,
   where,
   writeBatch,
 } from "firebase/firestore";
@@ -294,6 +295,7 @@ export default function WorkshopForm({ qrSrc }: WorkshopFormProps) {
           ? String(values.branchOther || "").trim()
           : values.department.trim();
       const stateValue = values.state.trim();
+      const collegeValue = values.college.trim();
 
       const uploadedUrl = await uploadScreenshot(selectedFile);
       if (!uploadedUrl) {
@@ -326,7 +328,7 @@ export default function WorkshopForm({ qrSrc }: WorkshopFormProps) {
         workshop_id: workshopRef.id,
         participant_id: participantRef.id,
         transaction_id: transactionRef.id,
-        college: values.college.trim(),
+        college: collegeValue,
         state: stateValue,
         roll_number: values.rollNumber.trim(),
         branch: branchValue,
@@ -351,15 +353,19 @@ export default function WorkshopForm({ qrSrc }: WorkshopFormProps) {
         created_at: serverTimestamp(),
       });
 
-      const analyticsRef = doc(db, "analytics", "summary");
-      batch.update(analyticsRef, {
-        total_workshop: increment(1),
-        [`colleges.${values.college.trim()}`]: increment(1),
-        [`colleges_workshop.${values.college.trim()}`]: increment(1),
-        updated_at: serverTimestamp(),
-      });
-
       await batch.commit();
+
+      const analyticsRef = doc(db, "analytics", "summary");
+      try {
+        await updateDoc(analyticsRef, {
+          total_workshop: increment(1),
+          [`colleges.${collegeValue}`]: increment(1),
+          [`colleges_workshop.${collegeValue}`]: increment(1),
+          updated_at: serverTimestamp(),
+        });
+      } catch (analyticsError) {
+        console.warn("Workshop analytics update skipped:", analyticsError);
+      }
 
       setSubmitSuccess(
         "Registration submitted successfully. Verification is pending from the admin panel."

@@ -3,6 +3,9 @@ const path = require("path");
 const { initializeApp, cert, getApps } = require("firebase-admin/app");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 
+const PRODUCTION_PROJECT_IDS = new Set(["ai4impact-cc315"]);
+const WIPE_CONFIRMATION_TOKEN = "I_UNDERSTAND_THIS_DELETES_ALL_FIRESTORE_DATA";
+
 function loadEnvFile(filePath) {
   if (!fs.existsSync(filePath)) {
     return;
@@ -60,7 +63,39 @@ function initAdmin() {
     });
   }
 
-  return getFirestore();
+  return {
+    db: getFirestore(),
+    projectId,
+  };
+}
+
+function assertDestructiveDeleteIsExplicitlyConfirmed(projectId) {
+  if (process.env.ALLOW_DESTRUCTIVE_DATA_SCRIPT !== "true") {
+    throw new Error(
+      "Blocked destructive script. Set ALLOW_DESTRUCTIVE_DATA_SCRIPT=true to continue."
+    );
+  }
+
+  if (process.env.CONFIRM_FIREBASE_PROJECT_ID !== projectId) {
+    throw new Error(
+      `Blocked destructive script. Set CONFIRM_FIREBASE_PROJECT_ID=${projectId} to continue.`
+    );
+  }
+
+  if (process.env.CONFIRM_WIPE_TOKEN !== WIPE_CONFIRMATION_TOKEN) {
+    throw new Error(
+      `Blocked destructive script. Set CONFIRM_WIPE_TOKEN=${WIPE_CONFIRMATION_TOKEN} to continue.`
+    );
+  }
+
+  if (
+    PRODUCTION_PROJECT_IDS.has(projectId) &&
+    process.env.ALLOW_PRODUCTION_DATA_WIPE !== "YES_DELETE_PRODUCTION_DATA"
+  ) {
+    throw new Error(
+      "Blocked destructive script for production project. Set ALLOW_PRODUCTION_DATA_WIPE=YES_DELETE_PRODUCTION_DATA only if this is intentionally a full production wipe."
+    );
+  }
 }
 
 async function clearCollectionRecursive(db, collectionId) {
@@ -77,7 +112,10 @@ async function clearCollectionRecursive(db, collectionId) {
 }
 
 async function main() {
-  const db = initAdmin();
+  const { db, projectId } = initAdmin();
+  assertDestructiveDeleteIsExplicitlyConfirmed(projectId);
+
+  console.log(`Confirmed destructive operation for project: ${projectId}`);
   const collections = await db.listCollections();
 
   if (!collections.length) {

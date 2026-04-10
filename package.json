@@ -4,10 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
-    "db:clear-test-data": "node scripts/clear-test-data.cjs"
+    "db:clear-test-data": "node scripts/clear-test-data.cjs",
+    "audit:storage-refs": "node scripts/audit-storage-references.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

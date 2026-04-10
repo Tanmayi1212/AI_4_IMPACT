@@ -5,8 +5,19 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
+import {
+  collection,
+  doc,
+  getDocs,
+  increment,
+  query,
+  serverTimestamp,
+  updateDoc,
+  where,
+  writeBatch,
+} from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
-import { storage } from "../../../lib/firebase";
+import { db, storage } from "../../../lib/firebase";
 import CyberDropdown from "./CyberDropdown";
 import PaymentSection from "./PaymentSection";
 import {
@@ -371,117 +382,126 @@ export default function HackathonForm({ qrSrc }: HackathonFormProps) {
     }
 
     try {
+      const memberEmails = Array.from(new Set(activeMembers.map((member) => member.email)));
+      const memberPhones = Array.from(new Set(activeMembers.map((member) => member.phone)));
+
+      const [emailMatches, phoneMatches] = await Promise.all([
+        getDocs(query(collection(db, "participants"), where("email", "in", memberEmails))),
+        getDocs(query(collection(db, "participants"), where("phone", "in", memberPhones))),
+      ]);
+
+      const existingHackathonEmailSet = new Set(
+        emailMatches.docs
+          .filter((participantDoc) => participantDoc.data().registration_type === "hackathon")
+          .map((participantDoc) => String(participantDoc.data().email || "").trim().toLowerCase())
+          .filter(Boolean)
+      );
+
+      const existingHackathonPhoneSet = new Set(
+        phoneMatches.docs
+          .filter((participantDoc) => participantDoc.data().registration_type === "hackathon")
+          .map((participantDoc) => String(participantDoc.data().phone || "").trim())
+          .filter(Boolean)
+      );
+
+      if (existingHackathonEmailSet.size || existingHackathonPhoneSet.size) {
+        activeMembers.forEach((member, index) => {
+          if (existingHackathonEmailSet.has(member.email)) {
+            setError(`members.${index}.email` as const, {
+              type: "manual",
+              message: "This email is already registered for hackathon.",
+            });
+          }
+
+          if (existingHackathonPhoneSet.has(member.phone)) {
+            setError(`members.${index}.phone` as const, {
+              type: "manual",
+              message: "This phone number is already registered for hackathon.",
+            });
+          }
+        });
+
+        setSubmitError(
+          "One or more member details are already registered for hackathon. Resolve highlighted fields and try again."
+        );
+        return;
+      }
+
       const uploadedUrl = await uploadScreenshot(selectedFile);
       if (!uploadedUrl) {
         return;
       }
 
-      const response = await fetch("/api/register/hackathon", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          team_name: values.teamName.trim(),
-          college: values.college.trim(),
-          state: values.state.trim(),
-          team_size: values.teamSize,
-          upi_transaction_id: values.transactionId.trim(),
-          screenshot_url: uploadedUrl,
-          members: activeMembers,
-        }),
+      const batch = writeBatch(db);
+      const teamRef = doc(collection(db, "hackathon_registrations"));
+      const transactionRef = doc(collection(db, "transactions"));
+      const participantRefs = activeMembers.map(() => doc(collection(db, "participants")));
+      const collegeValue = values.college.trim();
+      const stateValue = values.state.trim();
+      const normalizedTeamName = values.teamName.trim().replace(/\s+/g, " ").toLowerCase();
+
+      participantRefs.forEach((participantRef, index) => {
+        const member = activeMembers[index];
+        batch.set(participantRef, {
+          participant_id: participantRef.id,
+          name: member.name,
+          email: member.email,
+          phone: member.phone,
+          roll_number: member.roll_number,
+          state: member.state,
+          branch: member.branch,
+          department: member.department,
+          branch_selection: member.branch_selection,
+          year_of_study: member.year_of_study,
+          yearOfStudy: member.yearOfStudy,
+          registration_type: "hackathon",
+          registration_ref: teamRef.id,
+          created_at: serverTimestamp(),
+        });
       });
 
-      const rawResponseBody = await response.text();
-      const data = (() => {
-        if (!rawResponseBody) {
-          return {} as {
-            success?: boolean;
-            error?: string;
-            field_errors?: {
-              team_name?: string;
-              member_emails?: string[];
-              member_phones?: string[];
-            };
-          };
-        }
+      batch.set(teamRef, {
+        team_id: teamRef.id,
+        team_name: values.teamName.trim(),
+        team_name_normalized: normalizedTeamName,
+        college: collegeValue,
+        state: stateValue,
+        team_size: values.teamSize,
+        member_ids: participantRefs.map((participantRef) => participantRef.id),
+        members: activeMembers,
+        transaction_id: transactionRef.id,
+        payment_verified: false,
+        created_at: serverTimestamp(),
+      });
 
-        try {
-          return JSON.parse(rawResponseBody) as {
-            success?: boolean;
-            error?: string;
-            field_errors?: {
-              team_name?: string;
-              member_emails?: string[];
-              member_phones?: string[];
-            };
-          };
-        } catch {
-          return {} as {
-            success?: boolean;
-            error?: string;
-            field_errors?: {
-              team_name?: string;
-              member_emails?: string[];
-              member_phones?: string[];
-            };
-          };
-        }
-      })();
+      batch.set(transactionRef, {
+        transaction_id: transactionRef.id,
+        registration_type: "hackathon",
+        registration_ref: teamRef.id,
+        upi_transaction_id: values.transactionId.trim(),
+        screenshot_url: uploadedUrl,
+        amount: 800,
+        status: "pending",
+        verified_by: null,
+        verified_at: null,
+        created_at: serverTimestamp(),
+      });
 
-      if (!response.ok || !data?.success) {
-        const fieldErrors = data.field_errors || {};
+      await batch.commit();
 
-        if (fieldErrors?.team_name) {
-          setError("teamName", {
-            type: "manual",
-            message: String(fieldErrors.team_name),
-          });
-        }
+      const analyticsRef = doc(db, "analytics", "summary");
+      const teamSizeCounterField = values.teamSize === 3 ? "team_size_3" : "team_size_4";
 
-        const conflictingEmailSet = new Set(
-          Array.isArray(fieldErrors?.member_emails)
-            ? fieldErrors.member_emails.map((email: string) =>
-                String(email || "").trim().toLowerCase()
-              )
-            : []
-        );
-        const conflictingPhoneSet = new Set(
-          Array.isArray(fieldErrors?.member_phones)
-            ? fieldErrors.member_phones.map((phone: string) => String(phone || "").trim())
-            : []
-        );
-
-        if (conflictingEmailSet.size || conflictingPhoneSet.size) {
-          activeMembers.forEach((member, index) => {
-            if (conflictingEmailSet.has(member.email)) {
-              setError(`members.${index}.email` as const, {
-                type: "manual",
-                message: "This email is already registered for hackathon.",
-              });
-            }
-
-            if (conflictingPhoneSet.has(member.phone)) {
-              setError(`members.${index}.phone` as const, {
-                type: "manual",
-                message: "This phone number is already registered for hackathon.",
-              });
-            }
-          });
-        }
-
-        const maybeServerError =
-          typeof data?.error === "string"
-            ? data.error
-            : rawResponseBody && !rawResponseBody.trim().startsWith("<!DOCTYPE")
-            ? rawResponseBody.trim().slice(0, 220)
-            : "";
-
-        setSubmitError(
-          maybeServerError ||
-            `Failed to submit hackathon registration (HTTP ${response.status}). Please verify your details and try again.`
-        );
-        return;
+      try {
+        await updateDoc(analyticsRef, {
+          total_hackathon: increment(1),
+          [teamSizeCounterField]: increment(1),
+          [`colleges.${collegeValue}`]: increment(1),
+          [`colleges_hackathon.${collegeValue}`]: increment(1),
+          updated_at: serverTimestamp(),
+        });
+      } catch (analyticsError) {
+        console.warn("Hackathon analytics update skipped:", analyticsError);
       }
 
       setSubmitSuccess(
