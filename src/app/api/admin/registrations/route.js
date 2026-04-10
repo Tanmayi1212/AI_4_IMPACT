@@ -83,6 +83,20 @@ async function loadWorkshopRegistration(registrationRef) {
         name: participantData?.name || null,
         email: participantData?.email || null,
         phone: participantData?.phone || null,
+        roll: participantData?.roll_number || participantData?.roll || null,
+        branch:
+          participantData?.branch ||
+          participantData?.department ||
+          workshopData?.branch ||
+          workshopData?.department ||
+          null,
+        year_of_study:
+          participantData?.year_of_study ||
+          participantData?.yearOfStudy ||
+          workshopData?.year_of_study ||
+          workshopData?.yearOfStudy ||
+          null,
+        state: participantData?.state || workshopData?.state || null,
         college: workshopData?.college || null,
       };
     }
@@ -197,6 +211,10 @@ async function loadHackathonRegistration(registrationRef, paymentVerified) {
         name: data?.name || null,
         email: data?.email || null,
         phone: data?.phone || null,
+        roll: data?.roll_number || data?.roll || null,
+        branch: data?.branch || data?.department || null,
+        year_of_study: data?.year_of_study || data?.yearOfStudy || null,
+        state: data?.state || teamData?.state || null,
       };
     });
 
@@ -251,6 +269,7 @@ async function loadHackathonRegistration(registrationRef, paymentVerified) {
     team_id: teamDoc.id,
     team_name: teamData?.team_name || null,
     college: teamData?.college || null,
+    state: teamData?.state || null,
     team_size: teamData?.team_size || null,
     members,
     access_credentials: accessCredentials,

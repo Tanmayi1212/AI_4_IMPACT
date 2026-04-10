@@ -17,7 +17,9 @@ export default function CyberDropdown({
   disabled = false,
 }: CyberDropdownProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [openDirection, setOpenDirection] = useState<"down" | "up">("down");
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
     const onPointerDown = (event: MouseEvent) => {
@@ -48,14 +50,36 @@ export default function CyberDropdown({
 
   const selectedText = value || placeholder;
 
+  const handleToggle = () => {
+    if (disabled) {
+      return;
+    }
+
+    if (isOpen) {
+      setIsOpen(false);
+      return;
+    }
+
+    const triggerRect = triggerRef.current?.getBoundingClientRect();
+    if (triggerRect) {
+      const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+      const spaceBelow = viewportHeight - triggerRect.bottom;
+      const spaceAbove = triggerRect.top;
+      setOpenDirection(spaceBelow < 280 && spaceAbove > spaceBelow ? "up" : "down");
+    }
+
+    setIsOpen(true);
+  };
+
   return (
     <div ref={rootRef} className="relative">
       <button
+        ref={triggerRef}
         type="button"
         disabled={disabled}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
-        onClick={() => setIsOpen((open) => !open)}
+        onClick={handleToggle}
         className={[
           "group relative w-full rounded-xl border border-[rgba(141,54,213,0.28)]",
           "bg-[linear-gradient(180deg,rgba(141,54,213,0.12),rgba(141,54,213,0.06))]",
@@ -84,7 +108,8 @@ export default function CyberDropdown({
             exit={{ opacity: 0, y: -6, scale: 0.98 }}
             transition={{ duration: 0.18 }}
             className={[
-              "absolute left-0 right-0 z-30 mt-2 overflow-hidden rounded-2xl border",
+              "absolute left-0 right-0 z-[90] overflow-hidden rounded-2xl border",
+              openDirection === "up" ? "bottom-full mb-2" : "top-full mt-2",
               "border-[rgba(141,54,213,0.45)] bg-[#1A1031]",
               "shadow-[0_16px_36px_rgba(5,4,12,0.62),0_0_24px_rgba(141,54,213,0.26)]",
               "backdrop-blur",

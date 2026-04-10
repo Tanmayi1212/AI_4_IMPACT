@@ -415,11 +415,13 @@ export default function HackathonForm({ qrSrc }: HackathonFormProps) {
 
       const existingEmailSet = new Set(
         existingEmailDocs.docs
+          .filter((participantDoc) => participantDoc.data().registration_type === "hackathon")
           .map((participantDoc) => String(participantDoc.data().email || "").trim().toLowerCase())
           .filter(Boolean)
       );
       const existingPhoneSet = new Set(
         existingPhoneDocs.docs
+          .filter((participantDoc) => participantDoc.data().registration_type === "hackathon")
           .map((participantDoc) => String(participantDoc.data().phone || "").trim())
           .filter(Boolean)
       );
@@ -596,7 +598,7 @@ export default function HackathonForm({ qrSrc }: HackathonFormProps) {
         animate={optional ? { opacity: 1, y: 0 } : undefined}
         exit={optional ? { opacity: 0, y: 10 } : undefined}
         transition={{ duration: 0.25 }}
-        className="overflow-hidden rounded-2xl border border-[rgba(141,54,213,0.14)]"
+        className="overflow-visible rounded-2xl border border-[rgba(141,54,213,0.14)]"
       >
         <div className="flex items-center gap-2.5 border-b border-[rgba(141,54,213,0.1)] bg-[rgba(141,54,213,0.1)] px-4 py-3">
           <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-[linear-gradient(135deg,#46067A,#8D36D5)] font-[var(--font-dm-mono)] text-[10px] font-medium text-white shadow-[0_0_10px_rgba(141,54,213,0.5)]">

@@ -14,7 +14,6 @@ const PAGE_SIZE = 15;
 const TRACK_OPTIONS = [
   { value: "hackathon", label: "HACKATHON" },
   { value: "workshop", label: "WORKSHOP" },
-  { value: "all", label: "ALL TRACKS" },
 ];
 const EMAIL_STATE_META = {
   NOT_READY: {
@@ -165,14 +164,18 @@ function mapRegistrationItem(item) {
       registrationType,
       teamName: participant?.name || fallbackName,
       collegeName: participant?.college || "",
+      state: participant?.state || "",
       teamSize: 1,
       participants: hasParticipant
         ? [
             {
               name: participant?.name || "",
-              roll: "",
+              roll: participant?.roll || "",
               email: participant?.email || "",
               phone: participant?.phone || "",
+              branch: participant?.branch || "",
+              yearOfStudy: participant?.year_of_study || participant?.yearOfStudy || "",
+              state: participant?.state || "",
             },
           ]
         : [],
@@ -217,12 +220,16 @@ function mapRegistrationItem(item) {
     registrationType: registrationType || "hackathon",
     teamName: registration?.team_name || "",
     collegeName: registration?.college || "",
+    state: registration?.state || "",
     teamSize: Number(registration?.team_size) || members.length || null,
     participants: members.map((member) => ({
       name: member?.name || "",
-      roll: "",
+      roll: member?.roll || "",
       email: member?.email || "",
       phone: member?.phone || "",
+      branch: member?.branch || member?.department || "",
+      yearOfStudy: member?.year_of_study || member?.yearOfStudy || "",
+      state: member?.state || registration?.state || "",
     })),
     payment: {
       transactionId: item?.upi_transaction_id || "",
@@ -241,7 +248,7 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [registrations, setRegistrations] = useState([]);
   const [dataError, setDataError] = useState("");
-  const [filterTrack, setFilterTrack] = useState("hackathon");
+  const [filterTrack, setFilterTrack] = useState("workshop");
   const [searchTerm, setSearchTerm] = useState("");
   const [filterSize, setFilterSize] = useState("all");
   const [filterCollege, setFilterCollege] = useState("all");
@@ -365,10 +372,6 @@ export default function AdminDashboard() {
   }, [user, fetchRegistrations]);
 
   const registrationsForTrack = useMemo(() => {
-    if (filterTrack === "all") {
-      return registrations;
-    }
-
     return registrations.filter((registration) => registration.registrationType === filterTrack);
   }, [registrations, filterTrack]);
 
@@ -499,14 +502,8 @@ export default function AdminDashboard() {
     const sizeDist = [];
     if (filterTrack === "workshop") {
       sizeDist.push({ name: "Individual", value: stats.teamsOf1 });
-    } else if (filterTrack === "hackathon") {
-      sizeDist.push(
-        { name: "Size 3", value: stats.teamsOf3 },
-        { name: "Size 4", value: stats.teamsOf4 }
-      );
     } else {
       sizeDist.push(
-        { name: "Individual", value: stats.teamsOf1 },
         { name: "Size 3", value: stats.teamsOf3 },
         { name: "Size 4", value: stats.teamsOf4 }
       );
@@ -536,12 +533,7 @@ export default function AdminDashboard() {
       ];
     }
 
-    return [
-      { value: "all", label: "ALL SIZES" },
-      { value: "1", label: "SIZE 1" },
-      { value: "3", label: "SIZE 3" },
-      { value: "4", label: "SIZE 4" },
-    ];
+    return [{ value: "all", label: "ALL ENTRIES" }];
   }, [filterTrack]);
 
   // ── CSV Export ──
@@ -1091,7 +1083,7 @@ export default function AdminDashboard() {
           letterSpacing: "0.08em",
           marginBottom: "1rem",
         }}>
-          ACTIVE TRACK VIEW: {String(filterTrack || "all").toUpperCase()}
+          ACTIVE TRACK VIEW: {String(filterTrack || "workshop").toUpperCase()}
         </p>
 
         {/* ── Stats Cards ── */}
@@ -1101,16 +1093,10 @@ export default function AdminDashboard() {
             { label: "TOTAL PARTICIPANTS", value: stats.totalParticipants, color: "var(--neon-pink)" },
             ...(filterTrack === "workshop"
               ? [{ label: "INDIVIDUAL ENTRIES", value: stats.teamsOf1, color: "var(--neon-purple)" }]
-              : filterTrack === "hackathon"
-                ? [
-                    { label: "TEAMS OF 3", value: stats.teamsOf3, color: "var(--neon-cyan)" },
-                    { label: "TEAMS OF 4", value: stats.teamsOf4, color: "var(--neon-purple)" },
-                  ]
-                : [
-                    { label: "SIZE 1 ENTRIES", value: stats.teamsOf1, color: "var(--neon-purple)" },
-                    { label: "TEAMS OF 3", value: stats.teamsOf3, color: "var(--neon-cyan)" },
-                    { label: "TEAMS OF 4", value: stats.teamsOf4, color: "var(--neon-purple)" },
-                  ]),
+              : [
+                  { label: "TEAMS OF 3", value: stats.teamsOf3, color: "var(--neon-cyan)" },
+                  { label: "TEAMS OF 4", value: stats.teamsOf4, color: "var(--neon-purple)" },
+                ]),
             { label: "UNIQUE COLLEGES", value: stats.colleges, color: "var(--danger-red)" },
             ...(filterTrack === "workshop"
               ? []
@@ -1506,7 +1492,7 @@ export default function AdminDashboard() {
             {/* Registrations Over Time */}
             <div className="cyber-card" style={{ padding: "1.5rem", gridColumn: "1 / -1" }}>
               <h3 style={{ fontSize: "1.2rem", marginBottom: "1rem", borderBottom: "1px solid var(--text-muted)", paddingBottom: "0.5rem" }}>
-                📈 REGISTRATIONS OVER TIME ({String(filterTrack || "all").toUpperCase()})
+                📈 REGISTRATIONS OVER TIME ({String(filterTrack || "workshop").toUpperCase()})
               </h3>
               <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={analyticsData.timeline}>
@@ -1522,7 +1508,7 @@ export default function AdminDashboard() {
             {/* Top Colleges */}
             <div className="cyber-card" style={{ padding: "1.5rem" }}>
               <h3 style={{ fontSize: "1.2rem", marginBottom: "1rem", borderBottom: "1px solid var(--text-muted)", paddingBottom: "0.5rem" }}>
-                🏫 TOP COLLEGES ({String(filterTrack || "all").toUpperCase()})
+                🏫 TOP COLLEGES ({String(filterTrack || "workshop").toUpperCase()})
               </h3>
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={analyticsData.topColleges} layout="vertical">
@@ -1629,6 +1615,7 @@ export default function AdminDashboard() {
             <div style={{ marginBottom: "1.5rem", padding: "1rem", border: "1px solid var(--border-color)", background: "rgba(255,255,255,0.02)" }}>
               <p style={{ marginBottom: "0.5rem" }}><span style={{ color: "var(--neon-cyan)" }}>REGISTRATION TYPE:</span> {String(selectedTeam.registrationType || "unknown").toUpperCase()}</p>
               <p style={{ marginBottom: "0.5rem" }}><span style={{ color: "var(--neon-cyan)" }}>TEAM SIZE:</span> {selectedTeam.teamSize}</p>
+              <p style={{ marginBottom: "0.5rem" }}><span style={{ color: "var(--neon-cyan)" }}>STATE:</span> {selectedTeam.state || "N/A"}</p>
               <p style={{ marginBottom: "0.5rem" }}><span style={{ color: "var(--neon-cyan)" }}>TEAM LEADER:</span> {selectedLeaderName}</p>
               <p style={{ marginBottom: "0.5rem" }}><span style={{ color: "var(--neon-cyan)" }}>LEADER CONTACT:</span> {selectedLeaderContact}</p>
               <p style={{ marginBottom: "0.5rem" }}><span style={{ color: "var(--neon-cyan)" }}>SUBMITTED:</span> {fmtDate(selectedTeam.createdAt)}</p>
@@ -1807,11 +1794,14 @@ export default function AdminDashboard() {
                 <p style={{ color: idx === 0 ? "var(--neon-cyan)" : "var(--text-muted)", fontWeight: "bold", marginBottom: "0.3rem" }}>
                   {idx === 0 ? "LEADER" : `PARTICIPANT ${idx + 1}`}
                 </p>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.3rem 1rem", fontSize: "0.9rem" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: "0.3rem 1rem", fontSize: "0.9rem" }}>
                   <p><span style={{ color: "var(--text-muted)" }}>NAME:</span> {p.name}</p>
                   <p><span style={{ color: "var(--text-muted)" }}>ROLL:</span> {p.roll}</p>
                   <p><span style={{ color: "var(--text-muted)" }}>EMAIL:</span> {p.email}</p>
                   <p><span style={{ color: "var(--text-muted)" }}>PHONE:</span> {p.phone}</p>
+                  <p><span style={{ color: "var(--text-muted)" }}>BRANCH:</span> {p.branch || "N/A"}</p>
+                  <p><span style={{ color: "var(--text-muted)" }}>YEAR:</span> {p.yearOfStudy || "N/A"}</p>
+                  <p><span style={{ color: "var(--text-muted)" }}>STATE:</span> {p.state || selectedTeam.state || "N/A"}</p>
                 </div>
               </div>
             )) : (

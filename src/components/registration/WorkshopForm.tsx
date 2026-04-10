@@ -261,18 +261,25 @@ export default function WorkshopForm({ qrSrc }: WorkshopFormProps) {
 
       let hasDuplicate = false;
 
-      if (!emailMatches.empty) {
+      const hasWorkshopEmailDuplicate = emailMatches.docs.some(
+        (participantDoc) => participantDoc.data().registration_type === "workshop"
+      );
+      const hasWorkshopPhoneDuplicate = phoneMatches.docs.some(
+        (participantDoc) => participantDoc.data().registration_type === "workshop"
+      );
+
+      if (hasWorkshopEmailDuplicate) {
         setError("email", {
           type: "manual",
-          message: "This email already exists. Please use a different email.",
+          message: "This email is already used for workshop registration.",
         });
         hasDuplicate = true;
       }
 
-      if (!phoneMatches.empty) {
+      if (hasWorkshopPhoneDuplicate) {
         setError("phone", {
           type: "manual",
-          message: "This phone number already exists. Please use a different number.",
+          message: "This phone number is already used for workshop registration.",
         });
         hasDuplicate = true;
       }
