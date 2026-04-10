@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { FieldPath, FieldValue } from "firebase-admin/firestore";
 import { adminDb } from "../../../../../firebaseAdmin";
+
+export const dynamic = "force-static";
 import {
   asNormalizedEmail,
   asTrimmedString,
@@ -52,13 +54,16 @@ export async function POST(request) {
       );
     }
 
-    const existingParticipant = await adminDb
+    const existingParticipants = await adminDb
       .collection("participants")
       .where("email", "==", email)
-      .limit(1)
       .get();
 
-    if (!existingParticipant.empty) {
+    const workshopDuplicate = existingParticipants.docs.some(
+      (doc) => doc.get("registration_type") === "workshop"
+    );
+
+    if (workshopDuplicate) {
       await cleanupTempScreenshot(screenshotUrl);
       return badRequest("Email already registered.");
     }

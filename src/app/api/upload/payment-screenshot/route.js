@@ -3,6 +3,8 @@ import { randomUUID } from "crypto";
 import { Buffer } from "buffer";
 import { adminStorage } from "../../../../../firebaseAdmin";
 
+export const dynamic = "force-static";
+
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/jpg", "image/png"]);
 const ALLOWED_REGISTRATION_TYPES = new Set(["workshop", "hackathon"]);

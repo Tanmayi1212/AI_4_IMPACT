@@ -4,6 +4,8 @@ import { FieldValue } from "firebase-admin/firestore";
 import { adminAuth, adminDb } from "../../../../../firebaseAdmin";
 import { requireAdmin } from "../_utils/auth";
 
+export const dynamic = "force-static";
+
 export const runtime = "nodejs";
 
 const MIN_PASSWORD_LENGTH = 20;

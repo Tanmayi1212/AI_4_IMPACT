@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { adminAuth } from "../../../../../firebaseAdmin";
 
+export const dynamic = "force-static";
+
 const SESSION_COOKIE = "admin_session";
 
 const ADMIN_EMAILS = (

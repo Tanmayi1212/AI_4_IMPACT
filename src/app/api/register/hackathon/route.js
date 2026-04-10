@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { FieldPath, FieldValue } from "firebase-admin/firestore";
 import { adminDb } from "../../../../../firebaseAdmin";
+
+export const dynamic = "force-static";
 import {
   asNormalizedEmail,
   asTrimmedString,
@@ -86,17 +88,19 @@ export async function POST(request) {
     const existingParticipants = await adminDb
       .collection("participants")
       .where("email", "in", memberEmails)
-      .limit(memberEmails.length)
       .get();
 
-    if (!existingParticipants.empty) {
-      const existingEmailSet = new Set(
-        existingParticipants.docs
-          .map((doc) => asNormalizedEmail(doc.get("email")))
-          .filter(Boolean)
-      );
+    const existingHackathonEmailSet = new Set(
+      existingParticipants.docs
+        .filter((doc) => doc.get("registration_type") === "hackathon")
+        .map((doc) => asNormalizedEmail(doc.get("email")))
+        .filter(Boolean)
+    );
 
-      const duplicateEmail = memberEmails.find((email) => existingEmailSet.has(email));
+    if (existingHackathonEmailSet.size > 0) {
+      const duplicateEmail = memberEmails.find((email) =>
+        existingHackathonEmailSet.has(email)
+      );
 
       await cleanupTempScreenshot(screenshotUrl);
       return badRequest(`Email ${duplicateEmail || memberEmails[0]} is already registered.`);

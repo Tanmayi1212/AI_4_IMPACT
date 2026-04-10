@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { adminDb } from "../../../../../firebaseAdmin";
 import { requireAdmin } from "../_utils/auth";
 
+export const dynamic = "force-static";
+
 export const runtime = "nodejs";
 
 async function countPaymentsByStatus(status) {

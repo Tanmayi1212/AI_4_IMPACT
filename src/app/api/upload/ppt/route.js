@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { adminStorage } from "../../../../../lib/admin";
 
+export const dynamic = "force-static";
+
 const MAX_UPLOAD_BYTES = 20 * 1024 * 1024;
 
 export async function POST(request) {

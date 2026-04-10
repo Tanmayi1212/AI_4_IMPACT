@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { requireAdmin } from "../../_utils/auth";
 import { queueCredentialEmail } from "../../_utils/credential-email";
 
+export const dynamic = "force-static";
+
 export const runtime = "nodejs";
 
 const MAX_BULK_ITEMS = 150;

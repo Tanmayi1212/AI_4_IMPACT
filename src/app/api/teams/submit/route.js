@@ -5,6 +5,8 @@ import { ROLES } from "../../../../../lib/constants/roles";
 import { verifyRequestWithProfile } from "../../../../../lib/server/auth";
 import { getHackathonConfig, isSubmissionOpen } from "../../../../../lib/server/hackathon";
 
+export const dynamic = "force-static";
+
 function clean(value) {
   return String(value || "").trim();
 }

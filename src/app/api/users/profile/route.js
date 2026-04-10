@@ -4,6 +4,8 @@ import { adminDb } from "../../../../../lib/admin";
 import { ROLES, ROLE_LIST } from "../../../../../lib/constants/roles";
 import { verifyRequestUser } from "../../../../../lib/server/auth";
 
+export const dynamic = "force-static";
+
 function clean(value) {
   return String(value || "").trim();
 }

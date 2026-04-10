@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { adminAuth, adminDb } from "../../../../../firebaseAdmin";
 
+export const dynamic = "force-static";
+
 export const runtime = "nodejs";
 
 function unauthorized(message) {

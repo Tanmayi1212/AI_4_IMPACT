@@ -5,6 +5,18 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
+import {
+  collection,
+  doc,
+  getDocs,
+  increment,
+  query,
+  serverTimestamp,
+  where,
+  writeBatch,
+} from "firebase/firestore";
+import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
+import { db, storage } from "../../../lib/firebase";
 import PaymentSection from "./PaymentSection";
 import SubmitButton from "./SubmitButton";
 
@@ -123,31 +135,22 @@ export default function WorkshopForm({ qrSrc }: WorkshopFormProps) {
     setUploadMessage("Uploading screenshot securely...");
     setUploadMessageTone("info");
 
-    const formData = new FormData();
-    formData.append("image", file);
-    formData.append("registration_type", "workshop");
-
     try {
-      const response = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      });
-      const data = await response.json().catch(() => ({}));
-      const uploadedUrl = data?.screenshot_url || data?.url || "";
+      const ext = file.name.split(".").pop()?.toLowerCase() || "png";
+      const tempId = Math.random().toString(36).substring(2, 15);
+      const objectPath = `payments/workshop/temp_${tempId}.${ext}`;
+      const storageRef = ref(storage, objectPath);
 
-      if (!response.ok || !data?.success || !uploadedUrl) {
-        setUploadMessage("Upload failed. Please try again.");
-        setUploadMessageTone("error");
-        setFileError("Payment screenshot upload failed.");
-        return null;
-      }
+      await uploadBytes(storageRef, file);
+      const uploadedUrl = await getDownloadURL(storageRef);
 
       setUploadMessage("Screenshot uploaded successfully.");
       setUploadMessageTone("ok");
       setFileError(undefined);
       return uploadedUrl;
-    } catch {
-      setUploadMessage("Connection issue while uploading. Please try again.");
+    } catch (error) {
+      console.error("Workshop screenshot upload failed:", error);
+      setUploadMessage("Screenshot upload failed. Please try again.");
       setUploadMessageTone("error");
       setFileError("Payment screenshot upload failed.");
       return null;
@@ -185,46 +188,85 @@ export default function WorkshopForm({ qrSrc }: WorkshopFormProps) {
 
     setIsSubmitting(true);
 
-    const uploadedUrl = await uploadScreenshot(selectedFile);
-    if (!uploadedUrl) {
-      setIsSubmitting(false);
-      return;
-    }
-
     try {
-      const response = await fetch("/api/register/workshop", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: values.fullName.trim(),
-          email: values.email.trim().toLowerCase(),
-          phone: values.phone.trim(),
-          college: values.college.trim(),
-          roll_number: values.rollNumber.trim(),
-          department: values.department.trim(),
-          year_of_study: values.yearOfStudy.trim(),
-          upi_transaction_id: values.transactionId.trim(),
-          screenshot_url: uploadedUrl,
-        }),
-      });
+      const existingParticipants = await getDocs(
+        query(collection(db, "participants"), where("email", "==", values.email.trim().toLowerCase()))
+      );
+      const workshopDuplicate = existingParticipants.docs.some(
+        (participantDoc) => participantDoc.data().registration_type === "workshop"
+      );
 
-      const data = await response.json().catch(() => ({}));
-
-      if (!response.ok || !data?.success) {
-        setSubmitError(data?.error || "Submission failed. Please try again.");
+      if (workshopDuplicate) {
+        setSubmitError("Email already registered for workshop.");
         return;
       }
+
+      const uploadedUrl = await uploadScreenshot(selectedFile);
+      if (!uploadedUrl) {
+        return;
+      }
+
+      const batch = writeBatch(db);
+      const participantRef = doc(collection(db, "participants"));
+      const workshopRef = doc(collection(db, "workshop_registrations"));
+      const transactionRef = doc(collection(db, "transactions"));
+
+      batch.set(participantRef, {
+        participant_id: participantRef.id,
+        name: values.fullName.trim(),
+        email: values.email.trim().toLowerCase(),
+        phone: values.phone.trim(),
+        registration_type: "workshop",
+        registration_ref: workshopRef.id,
+        created_at: serverTimestamp(),
+      });
+
+      batch.set(workshopRef, {
+        workshop_id: workshopRef.id,
+        participant_id: participantRef.id,
+        transaction_id: transactionRef.id,
+        college: values.college.trim(),
+        payment_verified: false,
+        created_at: serverTimestamp(),
+      });
+
+      batch.set(transactionRef, {
+        transaction_id: transactionRef.id,
+        registration_type: "workshop",
+        registration_ref: workshopRef.id,
+        upi_transaction_id: values.transactionId.trim(),
+        screenshot_url: uploadedUrl,
+        amount: 60,
+        status: "pending",
+        verified_by: null,
+        verified_at: null,
+        created_at: serverTimestamp(),
+      });
+
+      const analyticsRef = doc(db, "analytics", "summary");
+      batch.update(analyticsRef, {
+        total_workshop: increment(1),
+        [`colleges.${values.college.trim()}`]: increment(1),
+        updated_at: serverTimestamp(),
+      });
+
+      await batch.commit();
 
       setSubmitSuccess(
         "Registration submitted successfully. Verification is pending from the admin panel."
       );
       reset();
-      setFileName("");
       setSelectedFile(null);
+      setFileName("");
       setUploadMessage("");
       setFileError(undefined);
-    } catch {
-      setSubmitError("Transmission failed. Please try again.");
+    } catch (error) {
+      console.error("Workshop registration failed:", error);
+      setSubmitError(
+        error instanceof Error && error.message
+          ? error.message
+          : "Connection error. Please check your internet and try again."
+      );
     } finally {
       setIsSubmitting(false);
     }

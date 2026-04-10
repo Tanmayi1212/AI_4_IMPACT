@@ -5,6 +5,8 @@ import { ROLES } from "../../../../../lib/constants/roles";
 import { verifyRequestWithProfile, isAdmin } from "../../../../../lib/server/auth";
 import { getHackathonConfig, getHackathonConfigRef } from "../../../../../lib/server/hackathon";
 
+export const dynamic = "force-static";
+
 export async function GET() {
   try {
     const config = await getHackathonConfig();

@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
 import { adminDb } from "../../../../lib/admin";
 
+export const dynamic = "force-static";
+
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const RATE_LIMIT_MAX_REQUESTS = 5;
 const workshopRateLimitStore = globalThis.__workshopRateLimitStore || new Map();

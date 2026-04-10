@@ -84,7 +84,7 @@ export default function RegistrationPortal({
           <header className="mb-10">
             <div className="mb-6 flex justify-center">
               <Image
-                src="/logo-w.svg"
+                src="/logo-w.png"
                 alt="AI4Impact"
                 width={294}
                 height={175}

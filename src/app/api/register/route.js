@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { POST as registerHackathon } from "./hackathon/route";
 import { cleanupTempScreenshot } from "./_utils/screenshotCleanup";
 
+export const dynamic = "force-static";
+
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const RATE_LIMIT_MAX_REQUESTS = 5;
 const registerRateLimitStore = globalThis.__registerRateLimitStore || new Map();
