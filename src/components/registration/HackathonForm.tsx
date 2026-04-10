@@ -5,19 +5,8 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import {
-  collection,
-  doc,
-  getDocs,
-  increment,
-  limit,
-  query,
-  serverTimestamp,
-  where,
-  writeBatch,
-} from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
-import { db, storage } from "../../../lib/firebase";
+import { storage } from "../../../lib/firebase";
 import CyberDropdown from "./CyberDropdown";
 import PaymentSection from "./PaymentSection";
 import {
@@ -151,13 +140,6 @@ type MessageTone = "ok" | "error" | "info";
 
 interface HackathonFormProps {
   qrSrc: string;
-}
-
-function normalizeTeamName(teamName: string) {
-  return String(teamName || "")
-    .trim()
-    .replace(/\s+/g, " ")
-    .toLowerCase();
 }
 
 function AnimatedFieldError({ message }: { message?: string }) {
@@ -389,145 +371,75 @@ export default function HackathonForm({ qrSrc }: HackathonFormProps) {
     }
 
     try {
-      const uniqueMemberEmails = Array.from(new Set(activeMembers.map((member) => member.email)));
-      const uniqueMemberPhones = Array.from(new Set(activeMembers.map((member) => member.phone)));
-      const normalizedTeamName = normalizeTeamName(values.teamName);
-
-      const [existingEmailDocs, existingPhoneDocs, exactTeamDocs, normalizedTeamDocs] =
-        await Promise.all([
-          getDocs(query(collection(db, "participants"), where("email", "in", uniqueMemberEmails))),
-          getDocs(query(collection(db, "participants"), where("phone", "in", uniqueMemberPhones))),
-          getDocs(
-            query(
-              collection(db, "hackathon_registrations"),
-              where("team_name", "==", values.teamName.trim()),
-              limit(1)
-            )
-          ),
-          getDocs(
-            query(
-              collection(db, "hackathon_registrations"),
-              where("team_name_normalized", "==", normalizedTeamName),
-              limit(1)
-            )
-          ),
-        ]);
-
-      const existingEmailSet = new Set(
-        existingEmailDocs.docs
-          .filter((participantDoc) => participantDoc.data().registration_type === "hackathon")
-          .map((participantDoc) => String(participantDoc.data().email || "").trim().toLowerCase())
-          .filter(Boolean)
-      );
-      const existingPhoneSet = new Set(
-        existingPhoneDocs.docs
-          .filter((participantDoc) => participantDoc.data().registration_type === "hackathon")
-          .map((participantDoc) => String(participantDoc.data().phone || "").trim())
-          .filter(Boolean)
-      );
-
-      let hasExistingDuplicate = false;
-
-      activeMembers.forEach((member, index) => {
-        if (existingEmailSet.has(member.email)) {
-          setError(`members.${index}.email` as const, {
-            type: "manual",
-            message: "This email already exists in registrations.",
-          });
-          hasExistingDuplicate = true;
-        }
-
-        if (existingPhoneSet.has(member.phone)) {
-          setError(`members.${index}.phone` as const, {
-            type: "manual",
-            message: "This phone number already exists in registrations.",
-          });
-          hasExistingDuplicate = true;
-        }
-      });
-
-      if (hasExistingDuplicate) {
-        setSubmitError("Email/phone must be unique. Resolve highlighted fields.");
-        return;
-      }
-
-      let teamNameTaken = !exactTeamDocs.empty || !normalizedTeamDocs.empty;
-
-      if (!teamNameTaken) {
-        const allTeamsSnapshot = await getDocs(collection(db, "hackathon_registrations"));
-        teamNameTaken = allTeamsSnapshot.docs.some((teamDoc) => {
-          const teamData = teamDoc.data() || {};
-          const rawName = String(teamData.team_name_normalized || teamData.team_name || "");
-          return normalizeTeamName(rawName) === normalizedTeamName;
-        });
-      }
-
-      if (teamNameTaken) {
-        setError("teamName", {
-          type: "manual",
-          message: "This team name has already been chosen.",
-        });
-        setSubmitError("Team name already exists. Choose another team name.");
-        return;
-      }
-
       const uploadedUrl = await uploadScreenshot(selectedFile);
       if (!uploadedUrl) {
         return;
       }
 
-      const batch = writeBatch(db);
-      const teamRef = doc(collection(db, "hackathon_registrations"));
-      const transactionRef = doc(collection(db, "transactions"));
-
-      const participantIds = activeMembers.map(() => doc(collection(db, "participants")).id);
-      activeMembers.forEach((member, index) => {
-        const participantRef = doc(db, "participants", participantIds[index]);
-        batch.set(participantRef, {
-          participant_id: participantRef.id,
-          ...member,
-          registration_type: "hackathon",
-          registration_ref: teamRef.id,
-          created_at: serverTimestamp(),
-        });
+      const response = await fetch("/api/register/hackathon", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          team_name: values.teamName.trim(),
+          college: values.college.trim(),
+          state: values.state.trim(),
+          team_size: values.teamSize,
+          upi_transaction_id: values.transactionId.trim(),
+          screenshot_url: uploadedUrl,
+          members: activeMembers,
+        }),
       });
 
-      batch.set(teamRef, {
-        team_id: teamRef.id,
-        team_name: values.teamName.trim(),
-        team_name_normalized: normalizedTeamName,
-        college: values.college.trim(),
-        state: values.state.trim(),
-        team_size: values.teamSize,
-        member_ids: participantIds,
-        transaction_id: transactionRef.id,
-        payment_verified: false,
-        created_at: serverTimestamp(),
-      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data?.success) {
+        const fieldErrors = data?.field_errors || {};
 
-      batch.set(transactionRef, {
-        transaction_id: transactionRef.id,
-        registration_type: "hackathon",
-        registration_ref: teamRef.id,
-        upi_transaction_id: values.transactionId.trim(),
-        screenshot_url: uploadedUrl,
-        amount: 800,
-        status: "pending",
-        verified_by: null,
-        verified_at: null,
-        created_at: serverTimestamp(),
-      });
+        if (fieldErrors?.team_name) {
+          setError("teamName", {
+            type: "manual",
+            message: String(fieldErrors.team_name),
+          });
+        }
 
-      const analyticsRef = doc(db, "analytics", "summary");
-      batch.update(analyticsRef, {
-        total_hackathon: increment(1),
-        [values.teamSize === 3 ? "team_size_3" : "team_size_4"]: increment(1),
-        [`colleges.${values.college.trim()}`]: increment(1),
-        [`colleges_hackathon.${values.college.trim()}`]: increment(1),
-        updated_at: serverTimestamp(),
-      });
+        const conflictingEmailSet = new Set(
+          Array.isArray(fieldErrors?.member_emails)
+            ? fieldErrors.member_emails.map((email: string) =>
+                String(email || "").trim().toLowerCase()
+              )
+            : []
+        );
+        const conflictingPhoneSet = new Set(
+          Array.isArray(fieldErrors?.member_phones)
+            ? fieldErrors.member_phones.map((phone: string) => String(phone || "").trim())
+            : []
+        );
 
-      await batch.commit();
+        if (conflictingEmailSet.size || conflictingPhoneSet.size) {
+          activeMembers.forEach((member, index) => {
+            if (conflictingEmailSet.has(member.email)) {
+              setError(`members.${index}.email` as const, {
+                type: "manual",
+                message: "This email is already registered for hackathon.",
+              });
+            }
+
+            if (conflictingPhoneSet.has(member.phone)) {
+              setError(`members.${index}.phone` as const, {
+                type: "manual",
+                message: "This phone number is already registered for hackathon.",
+              });
+            }
+          });
+        }
+
+        setSubmitError(
+          data?.error ||
+            "Failed to submit hackathon registration. Please verify your details and try again."
+        );
+        return;
+      }
 
       setSubmitSuccess(
         "Registration submitted successfully. Verification is pending from the admin panel."

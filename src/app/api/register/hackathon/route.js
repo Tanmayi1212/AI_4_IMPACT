@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { FieldPath, FieldValue } from "firebase-admin/firestore";
 import { adminDb } from "../../../../../firebaseAdmin";
 
-export const dynamic = "force-static";
+export const dynamic = "force-dynamic";
 import {
   asNormalizedEmail,
   asTrimmedString,
@@ -21,18 +21,43 @@ function badRequest(error) {
   return NextResponse.json({ error }, { status: 400 });
 }
 
+function conflict(error, fieldErrors = {}) {
+  return NextResponse.json(
+    { error, field_errors: fieldErrors },
+    { status: 409 }
+  );
+}
+
+function normalizeTeamName(value) {
+  return String(value || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+}
+
 export async function POST(request) {
   try {
     const body = await request.json();
 
     const teamName = asTrimmedString(body?.team_name);
+    const normalizedTeamName = normalizeTeamName(teamName);
     const college = asTrimmedString(body?.college);
+    const state = asTrimmedString(body?.state);
     const teamSize = Number(body?.team_size);
     const members = Array.isArray(body?.members) ? body.members : null;
     const upiTransactionId = asTrimmedString(body?.upi_transaction_id);
     const screenshotUrl = asTrimmedString(body?.screenshot_url);
 
-    if (!teamName || !college || !teamSize || !members || !upiTransactionId || !screenshotUrl) {
+    if (
+      !teamName ||
+      !normalizedTeamName ||
+      !college ||
+      !state ||
+      !teamSize ||
+      !members ||
+      !upiTransactionId ||
+      !screenshotUrl
+    ) {
       return badRequest("Missing required fields.");
     }
 
@@ -56,14 +81,19 @@ export async function POST(request) {
 
     const normalizedMembers = [];
     const emailSet = new Set();
+    const phoneSet = new Set();
 
     for (let index = 0; index < members.length; index += 1) {
       const member = members[index] || {};
       const name = asTrimmedString(member.name);
       const email = asNormalizedEmail(member.email);
       const phone = asTrimmedString(member.phone);
+      const rollNumber = asTrimmedString(member.roll_number || member.rollNumber || member.roll);
+      const branch = asTrimmedString(member.branch || member.department);
+      const yearOfStudy = asTrimmedString(member.year_of_study || member.yearOfStudy);
+      const branchSelection = asTrimmedString(member.branch_selection || member.department || branch);
 
-      if (!name || !email || !phone) {
+      if (!name || !email || !phone || !rollNumber || !branch || !yearOfStudy) {
         return badRequest(`Member ${index + 1} has missing required fields.`);
       }
 
@@ -79,31 +109,101 @@ export async function POST(request) {
         return badRequest(`Duplicate member email in request: ${email}.`);
       }
 
+      if (phoneSet.has(phone)) {
+        return badRequest(`Duplicate member phone in request: ${phone}.`);
+      }
+
       emailSet.add(email);
-      normalizedMembers.push({ name, email, phone });
+      phoneSet.add(phone);
+      normalizedMembers.push({
+        name,
+        email,
+        phone,
+        roll_number: rollNumber,
+        branch,
+        department: branch,
+        branch_selection: branchSelection,
+        year_of_study: yearOfStudy,
+        yearOfStudy,
+        state,
+      });
+    }
+
+    const [exactTeamSnapshot, normalizedTeamSnapshot] = await Promise.all([
+      adminDb
+        .collection("hackathon_registrations")
+        .where("team_name", "==", teamName)
+        .limit(1)
+        .get(),
+      adminDb
+        .collection("hackathon_registrations")
+        .where("team_name_normalized", "==", normalizedTeamName)
+        .limit(1)
+        .get(),
+    ]);
+
+    let teamNameTaken = !exactTeamSnapshot.empty || !normalizedTeamSnapshot.empty;
+    if (!teamNameTaken) {
+      const allTeamsSnapshot = await adminDb.collection("hackathon_registrations").get();
+      teamNameTaken = allTeamsSnapshot.docs.some((teamDoc) => {
+        const teamData = teamDoc.data() || {};
+        const rawTeamName = asTrimmedString(teamData?.team_name_normalized || teamData?.team_name);
+        return normalizeTeamName(rawTeamName) === normalizedTeamName;
+      });
+    }
+
+    if (teamNameTaken) {
+      await cleanupTempScreenshot(screenshotUrl);
+      return conflict("This team name has already been chosen.", {
+        team_name: "This team name has already been chosen.",
+      });
     }
 
     const memberEmails = normalizedMembers.map((member) => member.email);
+    const memberPhones = normalizedMembers.map((member) => member.phone);
 
-    const existingParticipants = await adminDb
-      .collection("participants")
-      .where("email", "in", memberEmails)
-      .get();
+    const [existingParticipantsByEmail, existingParticipantsByPhone] = await Promise.all([
+      adminDb
+        .collection("participants")
+        .where("email", "in", memberEmails)
+        .get(),
+      adminDb
+        .collection("participants")
+        .where("phone", "in", memberPhones)
+        .get(),
+    ]);
 
     const existingHackathonEmailSet = new Set(
-      existingParticipants.docs
+      existingParticipantsByEmail.docs
         .filter((doc) => doc.get("registration_type") === "hackathon")
         .map((doc) => asNormalizedEmail(doc.get("email")))
         .filter(Boolean)
     );
 
-    if (existingHackathonEmailSet.size > 0) {
-      const duplicateEmail = memberEmails.find((email) =>
-        existingHackathonEmailSet.has(email)
-      );
+    const existingHackathonPhoneSet = new Set(
+      existingParticipantsByPhone.docs
+        .filter((doc) => doc.get("registration_type") === "hackathon")
+        .map((doc) => asTrimmedString(doc.get("phone")))
+        .filter(Boolean)
+    );
+
+    const conflictingEmails = memberEmails.filter((email) => existingHackathonEmailSet.has(email));
+    const conflictingPhones = memberPhones.filter((phone) => existingHackathonPhoneSet.has(phone));
+
+    if (conflictingEmails.length > 0 || conflictingPhones.length > 0) {
+      const messageParts = [];
+      if (conflictingEmails.length > 0) {
+        messageParts.push("One or more member emails are already registered for hackathon.");
+      }
+      if (conflictingPhones.length > 0) {
+        messageParts.push("One or more member phone numbers are already registered for hackathon.");
+      }
 
       await cleanupTempScreenshot(screenshotUrl);
-      return badRequest(`Email ${duplicateEmail || memberEmails[0]} is already registered.`);
+      return conflict(messageParts.join(" "), {
+        member_emails: Array.from(new Set(conflictingEmails)),
+        member_phones: Array.from(new Set(conflictingPhones)),
+      });
     }
 
     const analyticsRef = adminDb.collection("analytics").doc("summary");
@@ -138,7 +238,9 @@ export async function POST(request) {
     batch.set(teamRef, {
       team_id: teamRef.id,
       team_name: teamName,
+      team_name_normalized: normalizedTeamName,
       college,
+      state,
       team_size: teamSize,
       member_ids: participantRefs.map((ref) => ref.id),
       transaction_id: transactionRef.id,
