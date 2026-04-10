@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg width="100%" height="100%" viewBox="0 0 2941 1748" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:serif="http://www.serif.com/" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linejoin:round;stroke-miterlimit:2;">
+    <g transform="matrix(1,0,0,1,-8286.400547,-6239.646519)">
+        <g transform="matrix(1,0,0,1,-50,427)">
+            <g transform="matrix(3.55636,0,0,3.556296,7996.59665,5083.747407)">
+                <text x="87px" y="355.679px" style="font-family:'Furore';font-size:213.705px;fill:white;">ai</text>
+                <text x="291.73px" y="355.679px" style="font-family:'Furore';font-size:213.705px;fill:none;stroke:white;stroke-width:2.25px;">4</text>
+                <g transform="matrix(213.705478,0,0,213.705478,926.648823,532.646907)">
+                </g>
+                <text x="87px" y="532.647px" style="font-family:'Furore';font-size:213.705px;fill:white;">impact</text>
+            </g>
+            <g>
+                <g transform="matrix(1,0,0,0.6,50,2304.2)">
+                    <rect x="9556" y="6478" width="700" height="100" style="fill:white;"/>
+                    <path d="M10256,6478L10256,6578L9556,6578L9556,6478L10256,6478ZM10249.403,6488.995L9562.597,6488.995L9562.597,6567.005L10249.403,6567.005L10249.403,6488.995Z" style="fill:white;"/>
+                </g>
+                <g transform="matrix(1,0,0,0.6,50,2284.2)">
+                    <rect x="9556" y="6678" width="900" height="100" style="fill:white;"/>
+                    <path d="M10456,6678L10456,6778L9556,6778L9556,6678L10456,6678ZM10449.403,6688.995L9562.597,6688.995L9562.597,6767.005L10449.403,6767.005L10449.403,6688.995Z" style="fill:white;"/>
+                </g>
+                <g transform="matrix(1,0,0,0.6,50,2324.2)">
+                    <rect x="9556" y="6278" width="1000" height="100" style="fill:white;"/>
+                    <path d="M10556,6278L10556,6378L9556,6378L9556,6278L10556,6278ZM10549.403,6288.995L9562.597,6288.995L9562.597,6367.005L10549.403,6367.005L10549.403,6288.995Z" style="fill:white;"/>
+                </g>
+            </g>
+        </g>
+        <g transform="matrix(1,0,0,1,-50,427)">
+            <g transform="matrix(1,0,0,1,-1560,6995.4)">
+                <g transform="matrix(1.000018,0,0,1,-0.178404,0)">
+                    <text x="9906px" y="217.6px" style="font-family:'Furore';font-size:168px;fill:white;">A National level</text>
+                </g>
+                <g transform="matrix(1.000018,0,0,1,-0.178404,0)">
+                    <g transform="matrix(168,0,0,168,12226.416,369.6)">
+                    </g>
+                    <text x="9906px" y="369.6px" style="font-family:'Furore';font-size:168px;fill:white;">hackathon-n-workshop</text>
+                </g>
+            </g>
+        </g>
+        <g transform="matrix(1,0,0,1,-50,427)">
+            <g transform="matrix(1,0,0,1,-1560,7351)">
+                <g transform="matrix(1.000018,0,0,1,-0.178404,0)">
+                    <g transform="matrix(128,0,0,128,11606.736,189.6)">
+                    </g>
+                    <text x="9906px" y="189.6px" style="font-family:'CarbonPlusBold', 'Carbon Plus';font-weight:700;font-size:128px;fill:white;">15th April to 18th April 2026</text>
+                </g>
+            </g>
+        </g>
+    </g>
+</svg>

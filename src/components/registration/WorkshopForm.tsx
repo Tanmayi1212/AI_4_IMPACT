@@ -20,6 +20,9 @@ const workshopSchema = z.object({
     .trim()
     .regex(/^\d{10}$/, "Phone must be exactly 10 digits."),
   college: z.string().trim().min(1, "College / University is required."),
+  rollNumber: z.string().trim().min(1, "Roll Number is required."),
+  department: z.string().trim().min(1, "Department is required."),
+  yearOfStudy: z.string().trim().min(1, "Year of Studying is required."),
   transactionId: z.string().trim().min(1, "Transaction ID is required."),
 });
 
@@ -95,6 +98,9 @@ export default function WorkshopForm({ qrSrc }: WorkshopFormProps) {
       email: "",
       phone: "",
       college: "",
+      rollNumber: "",
+      department: "",
+      yearOfStudy: "",
       transactionId: "",
     },
   });
@@ -103,7 +109,7 @@ export default function WorkshopForm({ qrSrc }: WorkshopFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [fileName, setFileName] = useState("");
-  const [screenshotUrl, setScreenshotUrl] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fileError, setFileError] = useState<string | undefined>(undefined);
 
   const [uploadMessage, setUploadMessage] = useState("");
@@ -112,7 +118,7 @@ export default function WorkshopForm({ qrSrc }: WorkshopFormProps) {
   const [submitError, setSubmitError] = useState("");
   const [submitSuccess, setSubmitSuccess] = useState("");
 
-  const uploadScreenshot = async (file: File) => {
+  const uploadScreenshot = async (file: File): Promise<string | null> => {
     setIsUploading(true);
     setUploadMessage("Uploading screenshot securely...");
     setUploadMessageTone("info");
@@ -130,22 +136,21 @@ export default function WorkshopForm({ qrSrc }: WorkshopFormProps) {
       const uploadedUrl = data?.screenshot_url || data?.url || "";
 
       if (!response.ok || !data?.success || !uploadedUrl) {
-        setScreenshotUrl("");
         setUploadMessage("Upload failed. Please try again.");
         setUploadMessageTone("error");
         setFileError("Payment screenshot upload failed.");
-        return;
+        return null;
       }
 
-      setScreenshotUrl(uploadedUrl);
       setUploadMessage("Screenshot uploaded successfully.");
       setUploadMessageTone("ok");
       setFileError(undefined);
+      return uploadedUrl;
     } catch {
-      setScreenshotUrl("");
       setUploadMessage("Connection issue while uploading. Please try again.");
       setUploadMessageTone("error");
       setFileError("Payment screenshot upload failed.");
+      return null;
     } finally {
       setIsUploading(false);
     }
@@ -157,26 +162,34 @@ export default function WorkshopForm({ qrSrc }: WorkshopFormProps) {
 
     if (!file) {
       setFileName("");
-      setScreenshotUrl("");
+      setSelectedFile(null);
       setUploadMessage("");
       setFileError(undefined);
       return;
     }
 
+    setSelectedFile(file);
     setFileName(file.name);
-    await uploadScreenshot(file);
+    setUploadMessage("File selected. Ready to submit.");
+    setUploadMessageTone("ok");
   };
 
   const onSubmit = async (values: WorkshopFormValues) => {
     setSubmitError("");
     setSubmitSuccess("");
 
-    if (!screenshotUrl) {
+    if (!selectedFile) {
       setFileError("Payment screenshot is required.");
       return;
     }
 
     setIsSubmitting(true);
+
+    const uploadedUrl = await uploadScreenshot(selectedFile);
+    if (!uploadedUrl) {
+      setIsSubmitting(false);
+      return;
+    }
 
     try {
       const response = await fetch("/api/register/workshop", {
@@ -187,8 +200,11 @@ export default function WorkshopForm({ qrSrc }: WorkshopFormProps) {
           email: values.email.trim().toLowerCase(),
           phone: values.phone.trim(),
           college: values.college.trim(),
+          roll_number: values.rollNumber.trim(),
+          department: values.department.trim(),
+          year_of_study: values.yearOfStudy.trim(),
           upi_transaction_id: values.transactionId.trim(),
-          screenshot_url: screenshotUrl,
+          screenshot_url: uploadedUrl,
         }),
       });
 
@@ -204,7 +220,7 @@ export default function WorkshopForm({ qrSrc }: WorkshopFormProps) {
       );
       reset();
       setFileName("");
-      setScreenshotUrl("");
+      setSelectedFile(null);
       setUploadMessage("");
       setFileError(undefined);
     } catch {
@@ -242,8 +258,8 @@ export default function WorkshopForm({ qrSrc }: WorkshopFormProps) {
           <AnimatedFieldError message={errors.fullName?.message} />
         </div>
 
-        <div className="mb-4 grid grid-cols-2 gap-[14px] max-sm:grid-cols-1">
-          <div>
+        <div className="mb-5 grid grid-cols-1 gap-5 sm:grid-cols-2">
+          <div className="mb-5">
             <label className="mb-[7px] block font-[var(--font-dm-mono)] text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(237,232,245,0.45)]">
               Email
             </label>
@@ -255,7 +271,7 @@ export default function WorkshopForm({ qrSrc }: WorkshopFormProps) {
             />
             <AnimatedFieldError message={errors.email?.message} />
           </div>
-          <div>
+          <div className="mb-5">
             <label className="mb-[7px] block font-[var(--font-dm-mono)] text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(237,232,245,0.45)]">
               Phone
             </label>
@@ -269,7 +285,7 @@ export default function WorkshopForm({ qrSrc }: WorkshopFormProps) {
           </div>
         </div>
 
-        <div>
+        <div className="mb-5">
           <label className="mb-[7px] block font-[var(--font-dm-mono)] text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(237,232,245,0.45)]">
             College / University
           </label>
@@ -280,6 +296,47 @@ export default function WorkshopForm({ qrSrc }: WorkshopFormProps) {
             {...register("college")}
           />
           <AnimatedFieldError message={errors.college?.message} />
+        </div>
+
+        <div className="mb-5 grid grid-cols-1 gap-5 sm:grid-cols-2">
+          <div>
+            <label className="mb-[7px] block font-[var(--font-dm-mono)] text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(237,232,245,0.45)]">
+              Roll Number
+            </label>
+            <input
+              type="text"
+              placeholder="e.g. 21BCE0001"
+              className="w-full rounded-xl border border-[rgba(141,54,213,0.2)] bg-[rgba(141,54,213,0.06)] px-4 py-[13px] font-[var(--font-dm-sans)] text-sm text-[#EDE8F5] outline-none transition-all duration-300 placeholder:text-[rgba(237,232,245,0.25)] hover:border-[rgba(141,54,213,0.4)] hover:bg-[rgba(141,54,213,0.09)] focus:border-[#8D36D5] focus:bg-[rgba(141,54,213,0.12)] focus:shadow-[0_0_0_3px_rgba(141,54,213,0.15),inset_0_0_0_1px_rgba(141,54,213,0.1)]"
+              {...register("rollNumber")}
+            />
+            <AnimatedFieldError message={errors.rollNumber?.message} />
+          </div>
+
+          <div>
+            <label className="mb-[7px] block font-[var(--font-dm-mono)] text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(237,232,245,0.45)]">
+              Department
+            </label>
+            <input
+              type="text"
+              placeholder="e.g. CSE"
+              className="w-full rounded-xl border border-[rgba(141,54,213,0.2)] bg-[rgba(141,54,213,0.06)] px-4 py-[13px] font-[var(--font-dm-sans)] text-sm text-[#EDE8F5] outline-none transition-all duration-300 placeholder:text-[rgba(237,232,245,0.25)] hover:border-[rgba(141,54,213,0.4)] hover:bg-[rgba(141,54,213,0.09)] focus:border-[#8D36D5] focus:bg-[rgba(141,54,213,0.12)] focus:shadow-[0_0_0_3px_rgba(141,54,213,0.15),inset_0_0_0_1px_rgba(141,54,213,0.1)]"
+              {...register("department")}
+            />
+            <AnimatedFieldError message={errors.department?.message} />
+          </div>
+        </div>
+
+        <div className="mb-8">
+          <label className="mb-[7px] block font-[var(--font-dm-mono)] text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(237,232,245,0.45)]">
+            Year of Studying
+          </label>
+          <input
+            type="text"
+            placeholder="e.g. 1st Year"
+            className="w-full rounded-xl border border-[rgba(141,54,213,0.2)] bg-[rgba(141,54,213,0.06)] px-4 py-[13px] font-[var(--font-dm-sans)] text-sm text-[#EDE8F5] outline-none transition-all duration-300 placeholder:text-[rgba(237,232,245,0.25)] hover:border-[rgba(141,54,213,0.4)] hover:bg-[rgba(141,54,213,0.09)] focus:border-[#8D36D5] focus:bg-[rgba(141,54,213,0.12)] focus:shadow-[0_0_0_3px_rgba(141,54,213,0.15),inset_0_0_0_1px_rgba(141,54,213,0.1)]"
+            {...register("yearOfStudy")}
+          />
+          <AnimatedFieldError message={errors.yearOfStudy?.message} />
         </div>
       </div>
 

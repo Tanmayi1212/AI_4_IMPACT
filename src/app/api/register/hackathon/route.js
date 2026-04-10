@@ -81,21 +81,25 @@ export async function POST(request) {
       normalizedMembers.push({ name, email, phone });
     }
 
-    const existingChecks = await Promise.all(
-      normalizedMembers.map(async (member) => {
-        const doc = await adminDb
-          .collection("participants")
-          .where("email", "==", member.email)
-          .limit(1)
-          .get();
-        return { email: member.email, exists: !doc.empty };
-      })
-    );
+    const memberEmails = normalizedMembers.map((member) => member.email);
 
-    const duplicateEmail = existingChecks.find((entry) => entry.exists);
-    if (duplicateEmail) {
+    const existingParticipants = await adminDb
+      .collection("participants")
+      .where("email", "in", memberEmails)
+      .limit(memberEmails.length)
+      .get();
+
+    if (!existingParticipants.empty) {
+      const existingEmailSet = new Set(
+        existingParticipants.docs
+          .map((doc) => asNormalizedEmail(doc.get("email")))
+          .filter(Boolean)
+      );
+
+      const duplicateEmail = memberEmails.find((email) => existingEmailSet.has(email));
+
       await cleanupTempScreenshot(screenshotUrl);
-      return badRequest(`Email ${duplicateEmail.email} is already registered.`);
+      return badRequest(`Email ${duplicateEmail || memberEmails[0]} is already registered.`);
     }
 
     const analyticsRef = adminDb.collection("analytics").doc("summary");

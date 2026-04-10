@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { DM_Mono, DM_Sans, Syne } from "next/font/google";
+import Image from "next/image";
 import TrackTabs from "./TrackTabs";
 import WorkshopForm from "./WorkshopForm";
 import HackathonForm from "./HackathonForm";
@@ -81,25 +82,42 @@ export default function RegistrationPortal({
       <div className="relative z-10 flex min-h-screen w-full items-start justify-center px-5 pb-20 pt-12 sm:pt-14">
         <div className="w-full max-w-[600px]">
           <header className="mb-10">
-            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[rgba(141,54,213,0.28)] bg-[rgba(141,54,213,0.14)] px-[14px] py-[6px] pl-[10px] font-[var(--font-dm-mono)] text-[10px] uppercase tracking-[0.12em] text-[rgba(237,232,245,0.7)] backdrop-blur-xl">
-              <motion.span
-                className="h-2 w-2 rounded-full bg-[#A855F7] shadow-[0_0_8px_#A855F7]"
-                animate={{ opacity: [1, 0.4, 1] }}
-                transition={{ duration: 2, repeat: Infinity }}
+            <div className="mb-6 flex justify-center">
+              <Image
+                src="/logo-w.svg"
+                alt="AI4Impact"
+                width={294}
+                height={175}
+                priority
+                className="h-auto w-full max-w-[280px]"
               />
-              Payment Verified Entry
             </div>
 
-            <h1 className="bg-[linear-gradient(135deg,#FFFFFF_30%,#C48EFF_70%,#8D36D5_100%)] bg-clip-text font-[var(--font-syne)] text-[clamp(26px,5vw,38px)] font-extrabold leading-[1.1] tracking-[-0.02em] text-transparent">
-              <span className="font-[var(--font-dm-mono)] text-[0.75em] tracking-[0.05em] text-[#8D36D5]">
-                {"///"}
-              </span>{" "}
-              Registration_Portal
+            <h1 className="mt-2 [font-family:var(--font-dm-sans)] text-[clamp(30px,5vw,42px)] font-semibold leading-[1.15] tracking-normal text-white">
+              Registration Form
             </h1>
 
-            <p className="mt-[10px] max-w-[440px] text-[13px] font-light leading-relaxed tracking-[0.01em] text-[rgba(237,232,245,0.45)]">
-              Workshop is individual participation. Hackathon is team participation with 3 or 4 members.
-            </p>
+            <div className="mt-[12px] max-w-[560px] space-y-3 text-[13px] font-light leading-relaxed tracking-[0.01em] text-white">
+              <p>
+                AI4Impact - Learn, Build, Impact! is a national-level Hackathon-n-Workshop
+                designed to empower students to innovate with purpose, taking place from 15th to
+                18th April 2026.
+              </p>
+              <p>
+                The event begins with Full Stack AI Workshops (15th &amp; 16th April), where
+                participants will gain hands-on experience in building and deploying AI/ML-powered
+                applications. This is followed by a 30-hour Hackathon (17th &amp; 18th April),
+                focused on solving real-world challenges through innovation and collaboration. To
+                streamline development, ready-to-use codebase templates will be provided, allowing
+                participants to focus purely on creativity and problem-solving.
+              </p>
+              <p>
+                At its core, AI4Impact is about leveraging technology for social good, encouraging
+                participants to build practical AI/ML solutions that address pressing societal
+                issues.
+              </p>
+              <p className="font-medium text-white">Learn. Build. Impact.</p>
+            </div>
           </header>
 
           <div

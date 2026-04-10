@@ -15,6 +15,9 @@ const memberSchema = z.object({
   name: z.string().trim(),
   email: z.string().trim(),
   phone: z.string().trim(),
+  rollNumber: z.string().trim(),
+  department: z.string().trim(),
+  yearOfStudy: z.string().trim(),
 });
 
 const hackathonSchema = z
@@ -62,6 +65,30 @@ const hackathonSchema = z
           code: "custom",
           message: "Phone must be exactly 10 digits.",
           path: ["members", index, "phone"],
+        });
+      }
+
+      if (!member.rollNumber.trim()) {
+        context.addIssue({
+          code: "custom",
+          message: "Roll number is required.",
+          path: ["members", index, "rollNumber"],
+        });
+      }
+
+      if (!member.department.trim()) {
+        context.addIssue({
+          code: "custom",
+          message: "Department is required.",
+          path: ["members", index, "department"],
+        });
+      }
+
+      if (!member.yearOfStudy.trim()) {
+        context.addIssue({
+          code: "custom",
+          message: "Year of studying is required.",
+          path: ["members", index, "yearOfStudy"],
         });
       }
     }
@@ -129,6 +156,9 @@ const createEmptyMember = () => ({
   name: "",
   email: "",
   phone: "",
+  rollNumber: "",
+  department: "",
+  yearOfStudy: "",
 });
 
 export default function HackathonForm({ qrSrc }: HackathonFormProps) {
@@ -169,7 +199,7 @@ export default function HackathonForm({ qrSrc }: HackathonFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [fileName, setFileName] = useState("");
-  const [screenshotUrl, setScreenshotUrl] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [fileError, setFileError] = useState<string | undefined>(undefined);
 
   const [uploadMessage, setUploadMessage] = useState("");
@@ -178,7 +208,7 @@ export default function HackathonForm({ qrSrc }: HackathonFormProps) {
   const [submitError, setSubmitError] = useState("");
   const [submitSuccess, setSubmitSuccess] = useState("");
 
-  const uploadScreenshot = async (file: File) => {
+  const uploadScreenshot = async (file: File): Promise<string | null> => {
     setIsUploading(true);
     setUploadMessage("Uploading screenshot securely...");
     setUploadMessageTone("info");
@@ -196,22 +226,21 @@ export default function HackathonForm({ qrSrc }: HackathonFormProps) {
       const uploadedUrl = data?.screenshot_url || data?.url || "";
 
       if (!response.ok || !data?.success || !uploadedUrl) {
-        setScreenshotUrl("");
         setUploadMessage("Upload failed. Please try again.");
         setUploadMessageTone("error");
         setFileError("Payment screenshot upload failed.");
-        return;
+        return null;
       }
 
-      setScreenshotUrl(uploadedUrl);
       setUploadMessage("Screenshot uploaded successfully.");
       setUploadMessageTone("ok");
       setFileError(undefined);
+      return uploadedUrl;
     } catch {
-      setScreenshotUrl("");
       setUploadMessage("Connection issue while uploading. Please try again.");
       setUploadMessageTone("error");
       setFileError("Payment screenshot upload failed.");
+      return null;
     } finally {
       setIsUploading(false);
     }
@@ -223,26 +252,34 @@ export default function HackathonForm({ qrSrc }: HackathonFormProps) {
 
     if (!file) {
       setFileName("");
-      setScreenshotUrl("");
+      setSelectedFile(null);
       setUploadMessage("");
       setFileError(undefined);
       return;
     }
 
+    setSelectedFile(file);
     setFileName(file.name);
-    await uploadScreenshot(file);
+    setUploadMessage("File selected. Ready to submit.");
+    setUploadMessageTone("ok");
   };
 
   const onSubmit = async (values: HackathonFormValues) => {
     setSubmitError("");
     setSubmitSuccess("");
 
-    if (!screenshotUrl) {
+    if (!selectedFile) {
       setFileError("Payment screenshot is required.");
       return;
     }
 
     setIsSubmitting(true);
+
+    const uploadedUrl = await uploadScreenshot(selectedFile);
+    if (!uploadedUrl) {
+      setIsSubmitting(false);
+      return;
+    }
 
     try {
       const response = await fetch("/api/register/hackathon", {
@@ -256,9 +293,12 @@ export default function HackathonForm({ qrSrc }: HackathonFormProps) {
             name: member.name.trim(),
             email: member.email.trim().toLowerCase(),
             phone: member.phone.trim(),
+            roll_number: member.rollNumber.trim(),
+            department: member.department.trim(),
+            year_of_study: member.yearOfStudy.trim(),
           })),
           upi_transaction_id: values.transactionId.trim(),
-          screenshot_url: screenshotUrl,
+          screenshot_url: uploadedUrl,
         }),
       });
 
@@ -266,6 +306,7 @@ export default function HackathonForm({ qrSrc }: HackathonFormProps) {
 
       if (!response.ok || !data?.success) {
         setSubmitError(data?.error || "Submission failed. Please try again.");
+        setIsSubmitting(false);
         return;
       }
 
@@ -285,7 +326,7 @@ export default function HackathonForm({ qrSrc }: HackathonFormProps) {
         transactionId: "",
       });
       setFileName("");
-      setScreenshotUrl("");
+      setSelectedFile(null);
       setUploadMessage("");
       setFileError(undefined);
     } catch {
@@ -433,8 +474,8 @@ export default function HackathonForm({ qrSrc }: HackathonFormProps) {
                 ) : null}
               </div>
 
-              <div className="grid grid-cols-2 gap-3 p-4 max-sm:grid-cols-1">
-                <div className="col-span-2 max-sm:col-span-1">
+              <div className="flex flex-col gap-4 p-4">
+                <div>
                   <label className="mb-[7px] block font-[var(--font-dm-mono)] text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(237,232,245,0.45)]">
                     Name
                   </label>
@@ -446,29 +487,72 @@ export default function HackathonForm({ qrSrc }: HackathonFormProps) {
                   />
                   <AnimatedFieldError message={errors.members?.[index]?.name?.message} />
                 </div>
-                <div>
-                  <label className="mb-[7px] block font-[var(--font-dm-mono)] text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(237,232,245,0.45)]">
-                    Email
-                  </label>
-                  <input
-                    type="email"
-                    placeholder="member@example.com"
-                    className="w-full rounded-xl border border-[rgba(141,54,213,0.2)] bg-[rgba(141,54,213,0.06)] px-4 py-[13px] font-[var(--font-dm-sans)] text-sm text-[#EDE8F5] outline-none transition-all duration-300 placeholder:text-[rgba(237,232,245,0.25)] hover:border-[rgba(141,54,213,0.4)] hover:bg-[rgba(141,54,213,0.09)] focus:border-[#8D36D5] focus:bg-[rgba(141,54,213,0.12)] focus:shadow-[0_0_0_3px_rgba(141,54,213,0.15),inset_0_0_0_1px_rgba(141,54,213,0.1)]"
-                    {...register(`members.${index}.email` as const)}
-                  />
-                  <AnimatedFieldError message={errors.members?.[index]?.email?.message} />
+                
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-[7px] block font-[var(--font-dm-mono)] text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(237,232,245,0.45)]">
+                      Email
+                    </label>
+                    <input
+                      type="email"
+                      placeholder="member@example.com"
+                      className="w-full rounded-xl border border-[rgba(141,54,213,0.2)] bg-[rgba(141,54,213,0.06)] px-4 py-[13px] font-[var(--font-dm-sans)] text-sm text-[#EDE8F5] outline-none transition-all duration-300 placeholder:text-[rgba(237,232,245,0.25)] hover:border-[rgba(141,54,213,0.4)] hover:bg-[rgba(141,54,213,0.09)] focus:border-[#8D36D5] focus:bg-[rgba(141,54,213,0.12)] focus:shadow-[0_0_0_3px_rgba(141,54,213,0.15),inset_0_0_0_1px_rgba(141,54,213,0.1)]"
+                      {...register(`members.${index}.email` as const)}
+                    />
+                    <AnimatedFieldError message={errors.members?.[index]?.email?.message} />
+                  </div>
+                  <div>
+                    <label className="mb-[7px] block font-[var(--font-dm-mono)] text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(237,232,245,0.45)]">
+                      Phone
+                    </label>
+                    <input
+                      type="tel"
+                      placeholder="10-digit mobile"
+                      className="w-full rounded-xl border border-[rgba(141,54,213,0.2)] bg-[rgba(141,54,213,0.06)] px-4 py-[13px] font-[var(--font-dm-sans)] text-sm text-[#EDE8F5] outline-none transition-all duration-300 placeholder:text-[rgba(237,232,245,0.25)] hover:border-[rgba(141,54,213,0.4)] hover:bg-[rgba(141,54,213,0.09)] focus:border-[#8D36D5] focus:bg-[rgba(141,54,213,0.12)] focus:shadow-[0_0_0_3px_rgba(141,54,213,0.15),inset_0_0_0_1px_rgba(141,54,213,0.1)]"
+                      {...register(`members.${index}.phone` as const)}
+                    />
+                    <AnimatedFieldError message={errors.members?.[index]?.phone?.message} />
+                  </div>
                 </div>
-                <div>
+
+                <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-[7px] block font-[var(--font-dm-mono)] text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(237,232,245,0.45)]">
+                      Roll Number
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 21BCE0001"
+                      className="w-full rounded-xl border border-[rgba(141,54,213,0.2)] bg-[rgba(141,54,213,0.06)] px-4 py-[13px] font-[var(--font-dm-sans)] text-sm text-[#EDE8F5] outline-none transition-all duration-300 placeholder:text-[rgba(237,232,245,0.25)] hover:border-[rgba(141,54,213,0.4)] hover:bg-[rgba(141,54,213,0.09)] focus:border-[#8D36D5] focus:bg-[rgba(141,54,213,0.12)] focus:shadow-[0_0_0_3px_rgba(141,54,213,0.15),inset_0_0_0_1px_rgba(141,54,213,0.1)]"
+                      {...register(`members.${index}.rollNumber` as const)}
+                    />
+                    <AnimatedFieldError message={errors.members?.[index]?.rollNumber?.message} />
+                  </div>
+                  <div>
+                    <label className="mb-[7px] block font-[var(--font-dm-mono)] text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(237,232,245,0.45)]">
+                      Department
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. CSE"
+                      className="w-full rounded-xl border border-[rgba(141,54,213,0.2)] bg-[rgba(141,54,213,0.06)] px-4 py-[13px] font-[var(--font-dm-sans)] text-sm text-[#EDE8F5] outline-none transition-all duration-300 placeholder:text-[rgba(237,232,245,0.25)] hover:border-[rgba(141,54,213,0.4)] hover:bg-[rgba(141,54,213,0.09)] focus:border-[#8D36D5] focus:bg-[rgba(141,54,213,0.12)] focus:shadow-[0_0_0_3px_rgba(141,54,213,0.15),inset_0_0_0_1px_rgba(141,54,213,0.1)]"
+                      {...register(`members.${index}.department` as const)}
+                    />
+                    <AnimatedFieldError message={errors.members?.[index]?.department?.message} />
+                  </div>
+                </div>
+
+                <div className="mb-3">
                   <label className="mb-[7px] block font-[var(--font-dm-mono)] text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(237,232,245,0.45)]">
-                    Phone
+                    Year of Studying
                   </label>
                   <input
-                    type="tel"
-                    placeholder="10-digit mobile"
+                    type="text"
+                    placeholder="e.g. 1st Year"
                     className="w-full rounded-xl border border-[rgba(141,54,213,0.2)] bg-[rgba(141,54,213,0.06)] px-4 py-[13px] font-[var(--font-dm-sans)] text-sm text-[#EDE8F5] outline-none transition-all duration-300 placeholder:text-[rgba(237,232,245,0.25)] hover:border-[rgba(141,54,213,0.4)] hover:bg-[rgba(141,54,213,0.09)] focus:border-[#8D36D5] focus:bg-[rgba(141,54,213,0.12)] focus:shadow-[0_0_0_3px_rgba(141,54,213,0.15),inset_0_0_0_1px_rgba(141,54,213,0.1)]"
-                    {...register(`members.${index}.phone` as const)}
+                    {...register(`members.${index}.yearOfStudy` as const)}
                   />
-                  <AnimatedFieldError message={errors.members?.[index]?.phone?.message} />
+                  <AnimatedFieldError message={errors.members?.[index]?.yearOfStudy?.message} />
                 </div>
               </div>
             </motion.div>
@@ -497,19 +581,21 @@ export default function HackathonForm({ qrSrc }: HackathonFormProps) {
                   </span>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 p-4 max-sm:grid-cols-1">
-                  <div className="col-span-2 max-sm:col-span-1">
-                    <label className="mb-[7px] block font-[var(--font-dm-mono)] text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(237,232,245,0.45)]">
-                      Name
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Member name"
-                      className="w-full rounded-xl border border-[rgba(141,54,213,0.2)] bg-[rgba(141,54,213,0.06)] px-4 py-[13px] font-[var(--font-dm-sans)] text-sm text-[#EDE8F5] outline-none transition-all duration-300 placeholder:text-[rgba(237,232,245,0.25)] hover:border-[rgba(141,54,213,0.4)] hover:bg-[rgba(141,54,213,0.09)] focus:border-[#8D36D5] focus:bg-[rgba(141,54,213,0.12)] focus:shadow-[0_0_0_3px_rgba(141,54,213,0.15),inset_0_0_0_1px_rgba(141,54,213,0.1)]"
-                      {...register("members.3.name")}
-                    />
-                    <AnimatedFieldError message={errors.members?.[3]?.name?.message} />
-                  </div>
+              <div className="flex flex-col gap-4 p-4">
+                <div>
+                  <label className="mb-[7px] block font-[var(--font-dm-mono)] text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(237,232,245,0.45)]">
+                    Name
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Member name"
+                    className="w-full rounded-xl border border-[rgba(141,54,213,0.2)] bg-[rgba(141,54,213,0.06)] px-4 py-[13px] font-[var(--font-dm-sans)] text-sm text-[#EDE8F5] outline-none transition-all duration-300 placeholder:text-[rgba(237,232,245,0.25)] hover:border-[rgba(141,54,213,0.4)] hover:bg-[rgba(141,54,213,0.09)] focus:border-[#8D36D5] focus:bg-[rgba(141,54,213,0.12)] focus:shadow-[0_0_0_3px_rgba(141,54,213,0.15),inset_0_0_0_1px_rgba(141,54,213,0.1)]"
+                    {...register("members.3.name")}
+                  />
+                  <AnimatedFieldError message={errors.members?.[3]?.name?.message} />
+                </div>
+
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div>
                     <label className="mb-[7px] block font-[var(--font-dm-mono)] text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(237,232,245,0.45)]">
                       Email
@@ -535,6 +621,47 @@ export default function HackathonForm({ qrSrc }: HackathonFormProps) {
                     <AnimatedFieldError message={errors.members?.[3]?.phone?.message} />
                   </div>
                 </div>
+
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <label className="mb-[7px] block font-[var(--font-dm-mono)] text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(237,232,245,0.45)]">
+                      Roll Number
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 21BCE0001"
+                      className="w-full rounded-xl border border-[rgba(141,54,213,0.2)] bg-[rgba(141,54,213,0.06)] px-4 py-[13px] font-[var(--font-dm-sans)] text-sm text-[#EDE8F5] outline-none transition-all duration-300 placeholder:text-[rgba(237,232,245,0.25)] hover:border-[rgba(141,54,213,0.4)] hover:bg-[rgba(141,54,213,0.09)] focus:border-[#8D36D5] focus:bg-[rgba(141,54,213,0.12)] focus:shadow-[0_0_0_3px_rgba(141,54,213,0.15),inset_0_0_0_1px_rgba(141,54,213,0.1)]"
+                      {...register("members.3.rollNumber")}
+                    />
+                    <AnimatedFieldError message={errors.members?.[3]?.rollNumber?.message} />
+                  </div>
+                  <div>
+                    <label className="mb-[7px] block font-[var(--font-dm-mono)] text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(237,232,245,0.45)]">
+                      Department
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. CSE"
+                      className="w-full rounded-xl border border-[rgba(141,54,213,0.2)] bg-[rgba(141,54,213,0.06)] px-4 py-[13px] font-[var(--font-dm-sans)] text-sm text-[#EDE8F5] outline-none transition-all duration-300 placeholder:text-[rgba(237,232,245,0.25)] hover:border-[rgba(141,54,213,0.4)] hover:bg-[rgba(141,54,213,0.09)] focus:border-[#8D36D5] focus:bg-[rgba(141,54,213,0.12)] focus:shadow-[0_0_0_3px_rgba(141,54,213,0.15),inset_0_0_0_1px_rgba(141,54,213,0.1)]"
+                      {...register("members.3.department")}
+                    />
+                    <AnimatedFieldError message={errors.members?.[3]?.department?.message} />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-[7px] block font-[var(--font-dm-mono)] text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(237,232,245,0.45)]">
+                    Year of Studying
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 1st Year"
+                    className="w-full rounded-xl border border-[rgba(141,54,213,0.2)] bg-[rgba(141,54,213,0.06)] px-4 py-[13px] font-[var(--font-dm-sans)] text-sm text-[#EDE8F5] outline-none transition-all duration-300 placeholder:text-[rgba(237,232,245,0.25)] hover:border-[rgba(141,54,213,0.4)] hover:bg-[rgba(141,54,213,0.09)] focus:border-[#8D36D5] focus:bg-[rgba(141,54,213,0.12)] focus:shadow-[0_0_0_3px_rgba(141,54,213,0.15),inset_0_0_0_1px_rgba(141,54,213,0.1)]"
+                    {...register("members.3.yearOfStudy")}
+                  />
+                  <AnimatedFieldError message={errors.members?.[3]?.yearOfStudy?.message} />
+                </div>
+              </div>
               </motion.div>
             ) : null}
           </AnimatePresence>
