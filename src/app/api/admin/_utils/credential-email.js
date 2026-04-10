@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { FieldValue } from "firebase-admin/firestore";
-import { adminAuth, adminDb } from "../../../../../firebaseAdmin";
+import { adminAuth, adminDb, FieldValue } from "../../../../../firebaseAdmin";
 
 const ENV = globalThis?.process?.env || {};
 

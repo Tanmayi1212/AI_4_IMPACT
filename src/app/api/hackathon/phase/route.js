@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { FieldValue } from "firebase-admin/firestore";
+import { FieldValue } from "../../../../../lib/admin";
 import { PHASE_LIST } from "../../../../../lib/constants/phases";
 import { ROLES } from "../../../../../lib/constants/roles";
 import { verifyRequestWithProfile, isAdmin } from "../../../../../lib/server/auth";

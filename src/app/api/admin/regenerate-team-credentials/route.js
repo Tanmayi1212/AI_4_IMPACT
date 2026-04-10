@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import crypto from "node:crypto";
-import { FieldValue } from "firebase-admin/firestore";
-import { adminAuth, adminDb } from "../../../../../firebaseAdmin";
+import { adminAuth, adminDb, FieldValue } from "../../../../../firebaseAdmin";
 import { requireAdmin } from "../_utils/auth";
 
 export const dynamic = "force-dynamic";

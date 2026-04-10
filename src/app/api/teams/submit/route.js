@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { FieldValue } from "firebase-admin/firestore";
-import { adminDb } from "../../../../../lib/admin";
+import { adminDb, FieldValue } from "../../../../../lib/admin";
 import { ROLES } from "../../../../../lib/constants/roles";
 import { verifyRequestWithProfile } from "../../../../../lib/server/auth";
 import { getHackathonConfig, isSubmissionOpen } from "../../../../../lib/server/hackathon";
