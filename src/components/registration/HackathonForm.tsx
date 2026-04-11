@@ -47,7 +47,7 @@ const hackathonSchema = z
     teamName: z.string().trim().min(1, "Team Name is required."),
     college: z.string().trim().min(1, "College / University is required."),
     state: z.string().trim().min(1, "State is required."),
-    teamSize: z.union([z.literal(3), z.literal(4)]),
+    teamSize: z.union([z.literal(2), z.literal(3), z.literal(4)]),
     members: z.array(memberSchema).length(4),
     transactionId: z.string().trim().min(1, "Transaction ID is required."),
   })
@@ -151,6 +151,7 @@ type MessageTone = "ok" | "error" | "info";
 
 interface HackathonFormProps {
   qrSrc: string;
+  duoQrSrc: string;
 }
 
 function AnimatedFieldError({ message }: { message?: string }) {
@@ -192,7 +193,7 @@ function AnimatedNotice({
           exit={{ opacity: 0, y: -4, height: 0 }}
           transition={{ duration: 0.2 }}
           className={[
-            "mx-8 mt-4 rounded-[11px] border px-3.5 py-3 text-[13px] font-semibold max-sm:mx-4",
+            "mx-8 mb-4 mt-5 rounded-[11px] border px-3.5 py-3 text-[13px] font-semibold max-sm:mx-4 max-sm:mb-3",
             toneClass,
           ].join(" ")}
         >
@@ -213,7 +214,7 @@ const createEmptyMember = () => ({
   yearOfStudy: "",
 });
 
-export default function HackathonForm({ qrSrc }: HackathonFormProps) {
+export default function HackathonForm({ qrSrc, duoQrSrc }: HackathonFormProps) {
   const {
     register,
     control,
@@ -231,7 +232,7 @@ export default function HackathonForm({ qrSrc }: HackathonFormProps) {
       teamName: "",
       college: "",
       state: "",
-      teamSize: 3,
+      teamSize: 2,
       members: [
         createEmptyMember(),
         createEmptyMember(),
@@ -439,6 +440,7 @@ export default function HackathonForm({ qrSrc }: HackathonFormProps) {
       const collegeValue = values.college.trim();
       const stateValue = values.state.trim();
       const normalizedTeamName = values.teamName.trim().replace(/\s+/g, " ").toLowerCase();
+      const payableAmount = values.teamSize === 2 ? 500 : 800;
 
       participantRefs.forEach((participantRef, index) => {
         const member = activeMembers[index];
@@ -480,7 +482,7 @@ export default function HackathonForm({ qrSrc }: HackathonFormProps) {
         registration_ref: teamRef.id,
         upi_transaction_id: values.transactionId.trim(),
         screenshot_url: uploadedUrl,
-        amount: 800,
+        amount: payableAmount,
         status: "pending",
         verified_by: null,
         verified_at: null,
@@ -490,7 +492,7 @@ export default function HackathonForm({ qrSrc }: HackathonFormProps) {
       await batch.commit();
 
       const analyticsRef = doc(db, "analytics", "summary");
-      const teamSizeCounterField = values.teamSize === 3 ? "team_size_3" : "team_size_4";
+      const teamSizeCounterField = `team_size_${values.teamSize}`;
 
       try {
         await updateDoc(analyticsRef, {
@@ -505,13 +507,13 @@ export default function HackathonForm({ qrSrc }: HackathonFormProps) {
       }
 
       setSubmitSuccess(
-        "Registration submitted successfully. Verification is pending from the admin panel."
+        "Registration successful. Team leader will be notified shortly with access credentials."
       );
       reset({
         teamName: "",
         college: "",
         state: "",
-        teamSize: 3,
+        teamSize: 2,
         members: [
           createEmptyMember(),
           createEmptyMember(),
@@ -536,22 +538,43 @@ export default function HackathonForm({ qrSrc }: HackathonFormProps) {
     }
   };
 
-  const handleTeamSizeChange = (size: 3 | 4) => {
+  const handleTeamSizeChange = (size: 2 | 3 | 4) => {
     setValue("teamSize", size, {
       shouldDirty: true,
       shouldValidate: true,
       shouldTouch: true,
     });
 
-    if (size === 3) {
+    const hiddenMemberErrors = [2, 3]
+      .filter((index) => index >= size)
+      .flatMap((index) => [
+        `members.${index}.name`,
+        `members.${index}.email`,
+        `members.${index}.phone`,
+        `members.${index}.rollNumber`,
+        `members.${index}.department`,
+        `members.${index}.branchOther`,
+        `members.${index}.yearOfStudy`,
+      ]);
+
+    if (hiddenMemberErrors.length > 0) {
       clearErrors([
-        "members.3.name",
-        "members.3.email",
-        "members.3.phone",
-        "members.3.rollNumber",
-        "members.3.department",
-        "members.3.branchOther",
-        "members.3.yearOfStudy",
+        ...(hiddenMemberErrors as Array<
+          | "members.2.name"
+          | "members.2.email"
+          | "members.2.phone"
+          | "members.2.rollNumber"
+          | "members.2.department"
+          | "members.2.branchOther"
+          | "members.2.yearOfStudy"
+          | "members.3.name"
+          | "members.3.email"
+          | "members.3.phone"
+          | "members.3.rollNumber"
+          | "members.3.department"
+          | "members.3.branchOther"
+          | "members.3.yearOfStudy"
+        >),
       ]);
     }
 
@@ -560,8 +583,10 @@ export default function HackathonForm({ qrSrc }: HackathonFormProps) {
   };
 
   const runSubmit = handleSubmit(onSubmit);
+  const displayAmount = teamSize === 2 ? "₹ 500" : "₹ 800";
+  const displayQrSrc = teamSize === 2 ? duoQrSrc : qrSrc;
 
-  const renderMemberCard = (index: number, optional = false) => {
+  const renderMemberCard = (index: number) => {
     const isLeader = index === 0;
     const branchSelection = watchedMembers?.[index]?.department;
 
@@ -569,9 +594,9 @@ export default function HackathonForm({ qrSrc }: HackathonFormProps) {
       <motion.div
         key={`member-${index + 1}`}
         layout
-        initial={optional ? { opacity: 0, y: 10 } : false}
-        animate={optional ? { opacity: 1, y: 0 } : undefined}
-        exit={optional ? { opacity: 0, y: 10 } : undefined}
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 10 }}
         transition={{ duration: 0.25 }}
         className="overflow-visible rounded-2xl border border-[rgba(141,54,213,0.14)]"
       >
@@ -585,11 +610,6 @@ export default function HackathonForm({ qrSrc }: HackathonFormProps) {
           {isLeader ? (
             <span className="ml-auto rounded-full bg-[rgba(141,54,213,0.15)] px-2 py-0.5 font-[var(--font-dm-mono)] text-[9px] uppercase tracking-[0.08em] text-[#8D36D5]">
               Leader
-            </span>
-          ) : null}
-          {optional ? (
-            <span className="ml-auto rounded-full bg-[rgba(141,54,213,0.15)] px-2 py-0.5 font-[var(--font-dm-mono)] text-[9px] uppercase tracking-[0.08em] text-[#8D36D5]">
-              Optional
             </span>
           ) : null}
         </div>
@@ -809,7 +829,27 @@ export default function HackathonForm({ qrSrc }: HackathonFormProps) {
           <label className="mb-[7px] block font-[var(--font-dm-mono)] text-[11px] font-medium uppercase tracking-[0.08em] text-[rgba(237,232,245,0.45)]">
             Team Size
           </label>
-          <div className="grid grid-cols-2 gap-2.5 max-sm:grid-cols-1">
+          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+            <button
+              type="button"
+              className={[
+                "flex items-center justify-center gap-2 rounded-xl border px-3 py-3 font-[var(--font-syne)] text-[12px] font-bold uppercase tracking-[0.08em] transition-all duration-300",
+                teamSize === 2
+                  ? "border-[#8D36D5] bg-[rgba(141,54,213,0.2)] text-[#EDE8F5] shadow-[0_0_0_2px_rgba(141,54,213,0.15),0_0_20px_rgba(141,54,213,0.12)]"
+                  : "border-[rgba(141,54,213,0.2)] bg-[rgba(141,54,213,0.06)] text-[rgba(237,232,245,0.45)] hover:border-[rgba(141,54,213,0.5)] hover:bg-[rgba(141,54,213,0.1)] hover:text-[#EDE8F5]",
+              ].join(" ")}
+              onClick={() => handleTeamSizeChange(2)}
+            >
+              <span
+                className={[
+                  "h-1.5 w-1.5 rounded-full transition-all duration-300",
+                  teamSize === 2
+                    ? "bg-[#8D36D5] shadow-[0_0_8px_#8D36D5]"
+                    : "bg-[rgba(141,54,213,0.4)]",
+                ].join(" ")}
+              />
+              2 Members
+            </button>
             <button
               type="button"
               className={[
@@ -866,19 +906,17 @@ export default function HackathonForm({ qrSrc }: HackathonFormProps) {
         </div>
 
         <div className="space-y-3.5">
-          {[0, 1, 2].map((index) => renderMemberCard(index))}
-
           <AnimatePresence initial={false}>
-            {teamSize === 4 ? renderMemberCard(3, true) : null}
+            {Array.from({ length: teamSize }, (_, index) => renderMemberCard(index))}
           </AnimatePresence>
         </div>
       </div>
 
       <PaymentSection
         type="hackathon"
-        amount="₹ 800"
+        amount={displayAmount}
         amountSuffix="per team"
-        qrSrc={qrSrc}
+        qrSrc={displayQrSrc}
         sectionTag="03 / 03"
         transactionInputProps={register("transactionId")}
         transactionError={errors.transactionId?.message}

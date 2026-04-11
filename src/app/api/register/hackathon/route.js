@@ -60,8 +60,8 @@ export async function POST(request) {
       return badRequest("Missing required fields.");
     }
 
-    if (![3, 4].includes(teamSize)) {
-      return badRequest("team_size must be either 3 or 4.");
+    if (![2, 3, 4].includes(teamSize)) {
+      return badRequest("team_size must be 2, 3 or 4.");
     }
 
     if (members.length !== teamSize) {
@@ -190,6 +190,7 @@ export async function POST(request) {
     const participantRefs = normalizedMembers.map(() => adminDb.collection("participants").doc());
 
     const batch = adminDb.batch();
+    const payableAmount = teamSize === 2 ? 500 : 800;
 
     participantRefs.forEach((participantRef, index) => {
       const member = normalizedMembers[index];
@@ -223,14 +224,14 @@ export async function POST(request) {
       registration_ref: teamRef.id,
       upi_transaction_id: upiTransactionId,
       screenshot_url: screenshotUrl,
-      amount: 800,
+      amount: payableAmount,
       status: "pending",
       verified_by: null,
       verified_at: null,
       created_at: FieldValue.serverTimestamp(),
     });
 
-    const teamSizeCounterField = teamSize === 3 ? "team_size_3" : "team_size_4";
+    const teamSizeCounterField = `team_size_${teamSize}`;
 
     batch.update(
       analyticsRef,

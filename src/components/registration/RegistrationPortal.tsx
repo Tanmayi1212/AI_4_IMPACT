@@ -11,11 +11,13 @@ import { portalStyles, type RegistrationTrack } from "./styles";
 interface RegistrationPortalProps {
   workshopQrSrc: string;
   hackathonQrSrc: string;
+  hackathonDuoQrSrc: string;
 }
 
 export default function RegistrationPortal({
   workshopQrSrc,
   hackathonQrSrc,
+  hackathonDuoQrSrc,
 }: RegistrationPortalProps) {
   const [activeTrack, setActiveTrack] = useState<RegistrationTrack>("workshop");
 
@@ -109,7 +111,7 @@ export default function RegistrationPortal({
               activeTrack={activeTrack}
               onTrackChange={setActiveTrack}
               workshopPanel={<WorkshopForm qrSrc={workshopQrSrc} />}
-              hackathonPanel={<HackathonForm qrSrc={hackathonQrSrc} />}
+              hackathonPanel={<HackathonForm qrSrc={hackathonQrSrc} duoQrSrc={hackathonDuoQrSrc} />}
             />
           </div>
         </div>
