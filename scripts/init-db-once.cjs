@@ -78,6 +78,7 @@ async function main() {
   await summaryRef.set({
     total_workshop: 0,
     total_hackathon: 0,
+    team_size_2: 0,
     team_size_3: 0,
     team_size_4: 0,
     colleges: {},

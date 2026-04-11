@@ -480,6 +480,7 @@ export default function AdminDashboard() {
     const totalRegs = registrationsForTrack.length;
     const totalParticipants = registrationsForTrack.reduce((s, r) => s + (r.participants?.length || 0), 0);
     const teamsOf1 = registrationsForTrack.filter((r) => r.teamSize === 1).length;
+    const teamsOf2 = registrationsForTrack.filter((r) => r.teamSize === 2).length;
     const teamsOf3 = registrationsForTrack.filter((r) => r.teamSize === 3).length;
     const teamsOf4 = registrationsForTrack.filter((r) => r.teamSize === 4).length;
     const colleges = new Set(registrationsForTrack.map((r) => r.collegeName?.toUpperCase())).size;
@@ -493,6 +494,7 @@ export default function AdminDashboard() {
       totalRegs,
       totalParticipants,
       teamsOf1,
+      teamsOf2,
       teamsOf3,
       teamsOf4,
       colleges,
@@ -548,6 +550,7 @@ export default function AdminDashboard() {
       sizeDist.push({ name: "Individual", value: stats.teamsOf1 });
     } else {
       sizeDist.push(
+        { name: "Size 2", value: stats.teamsOf2 },
         { name: "Size 3", value: stats.teamsOf3 },
         { name: "Size 4", value: stats.teamsOf4 }
       );
@@ -572,6 +575,7 @@ export default function AdminDashboard() {
     if (filterTrack === "hackathon") {
       return [
         { value: "all", label: "ALL SIZES" },
+        { value: "2", label: "SIZE 2" },
         { value: "3", label: "SIZE 3" },
         { value: "4", label: "SIZE 4" },
       ];
@@ -1256,8 +1260,9 @@ export default function AdminDashboard() {
             ...(filterTrack === "workshop"
               ? [{ label: "INDIVIDUAL ENTRIES", value: stats.teamsOf1, color: "var(--neon-purple)" }]
               : [
-                  { label: "TEAMS OF 3", value: stats.teamsOf3, color: "var(--neon-cyan)" },
-                  { label: "TEAMS OF 4", value: stats.teamsOf4, color: "var(--neon-purple)" },
+                  { label: "TEAMS OF 2", value: stats.teamsOf2, color: "var(--neon-cyan)" },
+                  { label: "TEAMS OF 3", value: stats.teamsOf3, color: "var(--neon-purple)" },
+                  { label: "TEAMS OF 4", value: stats.teamsOf4, color: "var(--danger-red)" },
                 ]),
             { label: "UNIQUE COLLEGES", value: stats.colleges, color: "var(--danger-red)" },
             ...(filterTrack === "workshop"

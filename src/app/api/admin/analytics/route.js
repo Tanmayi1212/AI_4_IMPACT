@@ -83,10 +83,11 @@ export async function GET(request) {
 
     const totalWorkshop = Number(summary.total_workshop || 0);
     const totalHackathon = Number(summary.total_hackathon || 0);
+    const teamSize2 = Number(summary.team_size_2 || 0);
     const teamSize3 = Number(summary.team_size_3 || 0);
     const teamSize4 = Number(summary.team_size_4 || 0);
     const workshopParticipants = totalWorkshop;
-    const hackathonParticipants = teamSize3 * 3 + teamSize4 * 4;
+    const hackathonParticipants = teamSize2 * 2 + teamSize3 * 3 + teamSize4 * 4;
 
     const collegesByTypeHackathon = readObjectMap(summary.colleges_hackathon);
     const collegesByTypeWorkshop = readObjectMap(summary.colleges_workshop);
@@ -102,6 +103,7 @@ export async function GET(request) {
       total_workshop: totalWorkshop,
       total_hackathon: totalHackathon,
       total_participants: totalParticipants,
+      team_size_2: teamSize2,
       team_size_3: teamSize3,
       team_size_4: teamSize4,
       participants: {

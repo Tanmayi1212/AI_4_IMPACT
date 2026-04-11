@@ -131,7 +131,7 @@ function AnimatedNotice({
           exit={{ opacity: 0, y: -4, height: 0 }}
           transition={{ duration: 0.2 }}
           className={[
-            "mx-8 mt-4 rounded-[11px] border px-3.5 py-3 text-[13px] font-semibold max-sm:mx-4",
+            "mx-8 mb-4 mt-5 rounded-[11px] border px-3.5 py-3 text-[13px] font-semibold max-sm:mx-4 max-sm:mb-3",
             toneClass,
           ].join(" ")}
         >
@@ -368,7 +368,7 @@ export default function WorkshopForm({ qrSrc }: WorkshopFormProps) {
       }
 
       setSubmitSuccess(
-        "Registration submitted successfully. Verification is pending from the admin panel."
+        "Registration successful. We'll contact you shortly regarding the venue details."
       );
       reset();
       setSelectedFile(null);

@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 
 const require = createRequire(import.meta.url);
 
-const { getApps, initializeApp, cert } = require("firebase-admin/app");
+const { getApp, getApps, initializeApp, cert } = require("firebase-admin/app");
 const { getAuth } = require("firebase-admin/auth");
 const { getFirestore, FieldPath, FieldValue, Timestamp } = require("firebase-admin/firestore");
 const { getStorage } = require("firebase-admin/storage");
@@ -63,12 +63,27 @@ function readServiceAccountFromFile() {
   }
 }
 
+const inferredProjectId =
+  process.env.FIREBASE_ADMIN_PROJECT_ID ||
+  process.env.FIREBASE_PROJECT_ID ||
+  process.env.GOOGLE_CLOUD_PROJECT ||
+  process.env.GCLOUD_PROJECT ||
+  "";
+
 const storageBucket =
-  process.env.FIREBASE_STORAGE_BUCKET || process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET;
+  process.env.FIREBASE_STORAGE_BUCKET ||
+  process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ||
+  (inferredProjectId ? `${inferredProjectId}.appspot.com` : "");
 
 const serviceAccount = readServiceAccountFromEnv() || readServiceAccountFromFile();
 
-if (!serviceAccount) {
+const runningInGoogleCloud =
+  Boolean(process.env.K_SERVICE) ||
+  Boolean(process.env.FUNCTION_TARGET) ||
+  Boolean(process.env.GOOGLE_CLOUD_PROJECT) ||
+  Boolean(process.env.GCLOUD_PROJECT);
+
+if (!serviceAccount && !runningInGoogleCloud) {
   throw new Error(
     "Missing Firebase Admin credentials. Set FIREBASE_ADMIN_* (or FIREBASE_*) env vars, or provide ai4impact-serviceAcc.json."
   );
@@ -78,15 +93,28 @@ if (!storageBucket) {
   throw new Error("Missing Firebase Storage Bucket in environment variables.");
 }
 
-if (!getApps().length) {
-  initializeApp({
-    credential: cert(serviceAccount),
+let adminApp;
+
+try {
+  adminApp = getApp();
+} catch {
+  const appOptions = {
     storageBucket,
-  });
+  };
+
+  if (serviceAccount) {
+    appOptions.credential = cert(serviceAccount);
+  }
+
+  if (!getApps().length) {
+    adminApp = initializeApp(appOptions);
+  } else {
+    adminApp = getApps()[0];
+  }
 }
 
-const adminAuth = getAuth();
-const adminDb = getFirestore();
-const adminStorage = getStorage().bucket(storageBucket);
+const adminAuth = getAuth(adminApp);
+const adminDb = getFirestore(adminApp);
+const adminStorage = getStorage(adminApp).bucket(storageBucket);
 
 export { adminAuth, adminDb, adminStorage, FieldPath, FieldValue, Timestamp };
