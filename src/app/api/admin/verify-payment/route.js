@@ -2,6 +2,11 @@ import { NextResponse } from "next/server";
 import crypto from "node:crypto";
 import { adminAuth, adminDb, FieldValue } from "../../../../../firebaseAdmin";
 import { requireAdmin } from "../_utils/auth";
+import {
+  attemptCredentialSheetExportSync,
+  buildCredentialSheetExportEvent,
+  createCredentialSheetExportEventRef,
+} from "../_utils/credential-sheet-export";
 
 export const dynamic = "force-dynamic";
 
@@ -329,6 +334,7 @@ export async function POST(request) {
     const paymentVerified = action === "verify";
 
     let accessCredentials = null;
+    let credentialSheetEventRef = null;
 
     if (action === "verify" && registrationType === "hackathon") {
       const teamLead = await getTeamLeadFromRegistration(registrationData);
@@ -396,11 +402,38 @@ export async function POST(request) {
 
     batch.update(registrationRef, registrationUpdates);
 
+    if (action === "verify" && registrationType === "hackathon" && accessCredentials) {
+      credentialSheetEventRef = createCredentialSheetExportEventRef();
+      batch.set(
+        credentialSheetEventRef,
+        buildCredentialSheetExportEvent({
+          eventType: "VERIFY_ISSUE",
+          transactionId,
+          registrationRef: registrationRefId,
+          registrationType,
+          issuedByAdminUid: authResult.decodedToken.uid,
+          credential: accessCredentials,
+          source: "api/admin/verify-payment",
+        })
+      );
+    }
+
     await batch.commit();
+
+    if (credentialSheetEventRef) {
+      const sheetSyncResult = await attemptCredentialSheetExportSync({
+        eventId: credentialSheetEventRef.id,
+      });
+
+      if (!sheetSyncResult?.success && !sheetSyncResult?.skipped) {
+        console.error("Credential sheet sync failed after verify action:", sheetSyncResult.error);
+      }
+    }
 
     return NextResponse.json({
       success: true,
       access_credentials: accessCredentials,
+      credential_export_event_id: credentialSheetEventRef?.id || null,
     });
   } catch (error) {
     console.error("Payment verification update failed:", error);

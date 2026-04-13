@@ -10,7 +10,8 @@
     "db:clear-test-data": "node scripts/clear-test-data.cjs",
     "audit:storage-refs": "node scripts/audit-storage-references.mjs",
     "health:runtime": "node scripts/check-runtime-endpoints.mjs",
-    "iam:grant-hosting-invoker": "node scripts/grant-hosting-run-invoker.cjs"
+    "iam:grant-hosting-invoker": "node scripts/grant-hosting-run-invoker.cjs",
+    "sheets:sync:pending": "node scripts/sync-credential-sheet-exports.mjs"
   },
   "dependencies": {
     "@gsap/react": "^2.1.2",
@@ -18,6 +19,7 @@
     "firebase": "^12.11.0",
     "firebase-admin": "^13.7.0",
     "framer-motion": "^12.38.0",
+    "googleapis": "^171.4.0",
     "gsap": "^3.14.2",
     "lucide-react": "^1.8.0",
     "next": "16.2.2",

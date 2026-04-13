@@ -2,6 +2,11 @@ import { NextResponse } from "next/server";
 import crypto from "node:crypto";
 import { adminAuth, adminDb, FieldValue } from "../../../../../firebaseAdmin";
 import { requireAdmin } from "../_utils/auth";
+import {
+  attemptCredentialSheetExportSync,
+  buildCredentialSheetExportEvent,
+  createCredentialSheetExportEventRef,
+} from "../_utils/credential-sheet-export";
 
 export const dynamic = "force-dynamic";
 
@@ -246,7 +251,21 @@ export async function POST(request) {
       ? existingAccess.passwordVersion + 1
       : 2;
 
-    await registrationRef.update({
+    const credentialPayload = {
+      team_id: existingAccess.teamId,
+      password: temporaryPassword,
+      leader_name: teamLead.name,
+      leader_email: teamLead.email,
+      leader_phone: teamLead.phone,
+      auth_uid: authUid,
+      password_issued: true,
+      password_version: nextPasswordVersion,
+    };
+
+    const credentialSheetEventRef = createCredentialSheetExportEventRef();
+    const batch = adminDb.batch();
+
+    batch.update(registrationRef, {
       team_access_id: existingAccess.teamId,
       team_lead_auth_uid: authUid,
       "access_credentials.team_id": existingAccess.teamId,
@@ -260,18 +279,42 @@ export async function POST(request) {
       "access_credentials.generated_at": registrationData?.access_credentials?.generated_at || FieldValue.serverTimestamp(),
     });
 
+    batch.set(
+      credentialSheetEventRef,
+      buildCredentialSheetExportEvent({
+        eventType: "REGENERATE",
+        transactionId,
+        registrationRef: registrationRefId,
+        registrationType: "hackathon",
+        issuedByAdminUid: authResult.decodedToken.uid,
+        credential: credentialPayload,
+        source: "api/admin/regenerate-team-credentials",
+      })
+    );
+
+    await batch.commit();
+
+    const sheetSyncResult = await attemptCredentialSheetExportSync({
+      eventId: credentialSheetEventRef.id,
+    });
+
+    if (!sheetSyncResult?.success && !sheetSyncResult?.skipped) {
+      console.error("Credential sheet sync failed after regeneration:", sheetSyncResult.error);
+    }
+
     return NextResponse.json({
       success: true,
       access_credentials: {
-        team_id: existingAccess.teamId,
-        password: temporaryPassword,
-        leader_name: teamLead.name,
-        leader_email: teamLead.email,
-        leader_phone: teamLead.phone,
-        auth_uid: authUid,
-        password_issued: true,
-        password_version: nextPasswordVersion,
+        team_id: credentialPayload.team_id,
+        password: credentialPayload.password,
+        leader_name: credentialPayload.leader_name,
+        leader_email: credentialPayload.leader_email,
+        leader_phone: credentialPayload.leader_phone,
+        auth_uid: credentialPayload.auth_uid,
+        password_issued: credentialPayload.password_issued,
+        password_version: credentialPayload.password_version,
       },
+      credential_export_event_id: credentialSheetEventRef.id,
     });
   } catch (error) {
     console.error("Team credential regeneration failed:", error);
