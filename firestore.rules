@@ -55,6 +55,22 @@ service cloud.firestore {
       return signedIn() && myRole() == "TEAM_LEAD";
     }
 
+    function isSelf(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    function selfCreateRoleIsAllowed() {
+      return !("role" in request.resource.data)
+        || request.resource.data.role == "PARTICIPANT";
+    }
+
+    function selfUpdateRoleIsAllowed() {
+      let changedRole = request.resource.data.diff(resource.data).changedKeys().hasAny(["role"]);
+
+      return !changedRole
+        || (!("role" in resource.data) && request.resource.data.role == "PARTICIPANT");
+    }
+
     // Team flow collections imported from companion repo.
     match /hackathon_config/{docId} {
       allow read: if docId == "global" || isAdmin();
@@ -62,8 +78,9 @@ service cloud.firestore {
     }
 
     match /users/{uid} {
-      allow read: if isAdmin() || (signedIn() && request.auth.uid == uid);
-      allow create, update: if signedIn() && request.auth.uid == uid;
+      allow read: if isAdmin() || isSelf(uid);
+      allow create: if isAdmin() || (isSelf(uid) && selfCreateRoleIsAllowed());
+      allow update: if isAdmin() || (isSelf(uid) && selfUpdateRoleIsAllowed());
       allow delete: if false;
     }
 

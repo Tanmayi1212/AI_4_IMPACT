@@ -1,14 +1,13 @@
 import { NextResponse } from "next/server";
 import { adminDb } from "../../../../../lib/admin";
 import { verifyRequestWithProfile, isAdmin } from "../../../../../lib/server/auth";
-import { ROLES } from "../../../../../lib/constants/roles";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request) {
   try {
     const { authUser, profile } = await verifyRequestWithProfile(request);
-    if (!authUser || (!isAdmin(profile, authUser) && profile?.role !== ROLES.ADMIN)) {
+    if (!authUser || !isAdmin(profile, authUser)) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
 

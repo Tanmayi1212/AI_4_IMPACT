@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "eslint",
     "db:clear-test-data": "node scripts/clear-test-data.cjs",
-    "audit:storage-refs": "node scripts/audit-storage-references.mjs"
+    "audit:storage-refs": "node scripts/audit-storage-references.mjs",
+    "health:runtime": "node scripts/check-runtime-endpoints.mjs",
+    "iam:grant-hosting-invoker": "node scripts/grant-hosting-run-invoker.cjs"
   },
   "dependencies": {
     "@gsap/react": "^2.1.2",

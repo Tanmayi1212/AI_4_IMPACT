@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { adminAuth } from "../../../../../firebaseAdmin";
+import { readRuntimeIdTokenFromRequest } from "../../../../../lib/runtime-auth";
 
 const ADMIN_EMAILS = (
   globalThis?.process?.env?.ADMIN_EMAILS ||
@@ -19,16 +20,13 @@ function unauthorized(message) {
 }
 
 export async function requireAdmin(request) {
-  const authHeader = request.headers.get("authorization") || "";
-  const bearerToken = authHeader.startsWith("Bearer ")
-    ? authHeader.slice(7).trim()
-    : "";
+  const bearerToken = readRuntimeIdTokenFromRequest(request);
   const sessionCookieToken = request.cookies?.get?.("admin_session")?.value?.trim?.() || "";
 
   const candidateTokens = [bearerToken, sessionCookieToken].filter(Boolean);
 
   if (candidateTokens.length === 0) {
-    return { error: unauthorized("Missing or invalid Authorization header.") };
+    return { error: unauthorized("Missing authentication token.") };
   }
 
   for (const token of candidateTokens) {
