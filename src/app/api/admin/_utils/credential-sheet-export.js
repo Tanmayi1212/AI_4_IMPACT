@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { adminDb, FieldValue, Timestamp } from "../../../../../firebaseAdmin";
+import { adminDb, FieldValue, Timestamp } from "../../../../../firebaseAdmin.js";
 
 const ENV = globalThis?.process?.env || {};
 
