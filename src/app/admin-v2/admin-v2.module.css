@@ -2115,15 +2115,22 @@
   }
 
   .tableWrap {
-    overflow-x: visible;
+    overflow-x: hidden;
   }
 
   .table {
+    display: block;
     width: 100%;
-    min-width: 100%;
-    table-layout: auto;
-    border-collapse: separate;
-    border-spacing: 0 8px;
+    min-width: 0;
+    max-width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+    border-spacing: 0;
+  }
+
+  .table colgroup,
+  .table col {
+    display: none;
   }
 
   .table thead {
@@ -2131,15 +2138,17 @@
   }
 
   .table tbody {
-    display: block;
+    display: grid;
+    gap: 10px;
     padding: 8px 10px 10px;
   }
 
   .table tbody tr {
     display: grid;
-    grid-template-columns: 1fr;
-    gap: 8px 10px;
-    margin: 0 0 10px;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+    width: 100%;
+    margin: 0;
     padding: 10px;
     border: 1px solid rgba(63, 63, 70, 0.86);
     border-radius: 12px;
@@ -2162,6 +2171,7 @@
 
   .table tbody tr.emptyTableRow {
     display: block;
+    width: 100%;
     margin: 0;
     padding: 0;
     border: 0;
@@ -2172,6 +2182,7 @@
 
   .table tbody tr.emptyTableRow td {
     display: block;
+    width: 100%;
     padding: 0;
   }
 
@@ -2181,9 +2192,10 @@
 
   .table tbody td {
     display: grid;
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     align-items: start;
     row-gap: 3px;
+    width: 100%;
     padding: 0;
     min-width: 0;
     border-bottom: 0;
@@ -2206,6 +2218,8 @@
 
   .table tbody td > * {
     grid-column: 1;
+    width: 100%;
+    max-width: 100%;
     min-width: 0;
     justify-self: start;
     text-align: left;
@@ -2227,6 +2241,7 @@
     display: inline-flex;
     align-items: center;
     justify-content: flex-start;
+    flex-wrap: wrap;
     gap: 6px;
     max-width: 100%;
     min-width: 0;
@@ -2250,6 +2265,23 @@
 
   .table tbody td.cellIndex .cellText {
     text-align: left;
+  }
+
+  .table tbody .cellText,
+  .table tbody .teamName,
+  .table tbody .cellMono {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    overflow-wrap: anywhere;
+  }
+
+  .table tbody .trackPill,
+  .table tbody .statusBadge,
+  .table tbody .emailBadge,
+  .table tbody .dupTag {
+    width: fit-content;
+    max-width: 100%;
   }
 }
 
@@ -2330,9 +2362,8 @@
     min-width: 100%;
   }
 
-  .table th,
-  .table td {
-    padding: 8px;
+  .table tbody td {
+    padding: 0;
   }
 
   .detailGrid,
