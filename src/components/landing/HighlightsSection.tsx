@@ -68,53 +68,7 @@ export default function HighlightsSection() {
         </p>
       </motion.article>
 
-      {/* Secondary Metrics Grid */}
-      <div className="mt-12 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {[
-          { label: "Design Tracks", value: "04", tech: "ARCH_FRONTEND // API_ECO // CLOUD // AI_ML" },
-          { label: "Expert Mentors", value: "30+", tech: "DOMAIN_LEADS // TECH_VET // POLICY_EXP" },
-          { label: "Active Teams", value: "75+", tech: "GLOBAL_TALENT // INNOVATION_NODES" },
-        ].map((metric, idx) => (
-          <motion.article
-            key={metric.label}
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6, delay: 0.2 + idx * 0.1, ease: [0.16, 1, 0.3, 1] }}
-            className="group relative flex flex-col p-8"
-          >
-            <svg
-              className="absolute inset-0 h-full w-full opacity-40 transition-all duration-500 group-hover:opacity-80 group-hover:drop-shadow-[0_0_15px_rgba(141,54,213,0.3)]"
-              viewBox="0 0 400 200"
-              preserveAspectRatio="none"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M0,40 L40,0 L400,0 L400,160 L360,200 L0,200 Z"
-                fill="rgba(141, 54, 213, 0.05)"
-                stroke="rgba(141, 54, 213, 0.2)"
-                strokeWidth="2"
-                className="transition-colors group-hover:stroke-[#8D36D5]"
-              />
-              <path d="M0,40 L40,0" stroke="#8D36D5" strokeWidth="4" className="opacity-50" />
-              <path d="M400,160 L360,200" stroke="#8D36D5" strokeWidth="4" className="opacity-50" />
-            </svg>
-
-            <div className="relative z-10">
-              <span className="text-[10px] font-black tracking-[0.3em] text-[#8D36D5] uppercase truncate block mb-4">
-                {metric.tech}
-              </span>
-              <p className="text-5xl font-black tracking-tighter text-white sm:text-6xl transition-transform group-hover:scale-105 duration-500">
-                {metric.value}
-              </p>
-              <p className="mt-2 text-xs font-bold uppercase tracking-[0.4em] text-zinc-500 group-hover:text-white transition-colors">
-                {metric.label}
-              </p>
-            </div>
-          </motion.article>
-        ))}
-      </div>
+      </motion.article>
     </section>
   );
 }

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Menu, X } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useScroll, useSpring } from "framer-motion";
 
 const navItems = [
   { label: "Home", href: "#hero" },
@@ -17,6 +17,13 @@ export default function LandingNavbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [activeSection, setActiveSection] = useState("hero");
+
+  const { scrollYProgress } = useScroll();
+  const scaleX = useSpring(scrollYProgress, {
+    stiffness: 100,
+    damping: 30,
+    restDelta: 0.001
+  });
 
   useEffect(() => {
     const handleScroll = () => {
@@ -56,6 +63,12 @@ export default function LandingNavbar() {
         scrolled ? "py-3" : "py-6"
       }`}
     >
+      {/* Scroll Progress Laser */}
+      <motion.div
+        className="fixed top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-[#8D36D5] via-cyan-400 to-[#46067A] origin-left z-[60]"
+        style={{ scaleX }}
+      />
+      
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <nav className={`relative overflow-hidden rounded-[2rem] border border-white/10 transition-all duration-500 ${
           scrolled || isOpen ? "bg-black/90 backdrop-blur-2xl shadow-2xl" : "bg-black/40 backdrop-blur-lg"

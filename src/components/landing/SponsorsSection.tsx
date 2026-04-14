@@ -88,37 +88,7 @@ export default function SponsorsSection() {
         </div>
       </motion.article>
 
-      {/* SUPPORTING PARTNERS GRID */}
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        {regularSponsors.map((sponsor, idx) => (
-          <motion.div
-            key={sponsor.role}
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6, delay: idx * 0.1, ease: [0.16, 1, 0.3, 1] }}
-            className="group relative h-40 overflow-hidden rounded-2xl border border-white/5 bg-white/[0.02] p-6 backdrop-blur-md transition-all duration-500 hover:bg-white/[0.05] hover:border-[#8D36D5]/30"
-          >
-            <div className="absolute -right-4 -top-4 h-16 w-16 rounded-full bg-[#8D36D5]/5 blur-2xl group-hover:bg-[#8D36D5]/20" />
-            
-            <div className="relative z-10 flex h-full flex-col justify-between">
-              <div>
-                <span className="text-[8px] font-black uppercase tracking-[0.3em] text-[#8D36D5]/60 mb-1 block">
-                  {sponsor.role}
-                </span>
-                <h4 className="text-lg font-black tracking-tight text-white group-hover:text-cyan-400 transition-colors">
-                  {sponsor.name}
-                </h4>
-              </div>
-              
-              <div className="flex items-center gap-2">
-                <div className="h-[1px] w-4 bg-white/10" />
-                <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest">{sponsor.detail}</span>
-              </div>
-            </div>
-          </motion.div>
-        ))}
-      </div>
+      </motion.article>
     </section>
   );
 }

@@ -164,8 +164,8 @@ export default function TimelineSection() {
         </div>
       </motion.div>
 
-      <div className="rounded-[2.5rem] border border-white/5 bg-white/[0.01] p-4 backdrop-blur-3xl sm:p-6 lg:p-12">
-        <div className="mb-10 flex items-center gap-4">
+      <div className="py-12 sm:py-16 lg:py-24">
+        <div className="mb-14 flex items-center gap-4">
           <div className="h-[1px] w-12 bg-[#8D36D5]" />
           <span className="text-[10px] font-black tracking-[0.5em] text-[#8D36D5] uppercase">
             TEMPORAL_SEQUENCE_STREAM
