@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Menu, X } from "lucide-react";
+import { ChevronDown, Menu, X } from "lucide-react";
 import { motion, AnimatePresence, useScroll, useSpring } from "framer-motion";
 import Link from "next/link";
 
@@ -16,6 +16,7 @@ const navItems = [
 
 export default function LandingNavbar() {
   const [isOpen, setIsOpen] = useState(false);
+  const [isRegisterMenuOpen, setIsRegisterMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [activeSection, setActiveSection] = useState("hero");
 
@@ -67,8 +68,32 @@ export default function LandingNavbar() {
 
   const closeMenu = () => {
     setIsOpen(false);
+    setIsRegisterMenuOpen(false);
     document.body.style.overflow = "unset";
   };
+
+  useEffect(() => {
+    const handleOutsideClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest("[data-register-dropdown]")) {
+        setIsRegisterMenuOpen(false);
+      }
+    };
+
+    const handleEsc = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsRegisterMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleOutsideClick);
+    document.addEventListener("keydown", handleEsc);
+
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+      document.removeEventListener("keydown", handleEsc);
+    };
+  }, []);
 
   const menuVariants = {
     closed: {
@@ -107,7 +132,7 @@ export default function LandingNavbar() {
       />
       
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <nav className={`relative overflow-hidden rounded-[2rem] border border-white/10 transition-all duration-500 ${
+        <nav className={`relative overflow-visible rounded-[2rem] border border-white/10 transition-all duration-500 ${
           scrolled || isOpen ? "bg-black/95 backdrop-blur-2xl shadow-2xl" : "bg-black/40 backdrop-blur-lg"
         } px-6 py-4`}>
           {/* Animated Background Glow - Hidden on very small screens to prevent overflow */}
@@ -146,17 +171,55 @@ export default function LandingNavbar() {
                 );
               })}
               <li className="ml-6">
-                <motion.a
-                  href="/#register"
+                <motion.div
+                  data-register-dropdown
                   animate={{ 
                     boxShadow: ["0 0 10px rgba(141,54,213,0.2)", "0 0 25px rgba(141,54,213,0.4)", "0 0 10px rgba(141,54,213,0.2)"],
                   }}
                   transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-                  className="touch-target relative group inline-flex items-center overflow-hidden whitespace-nowrap rounded-xl bg-white px-6 py-2.5 text-[11px] font-black uppercase tracking-[0.2em] text-black shadow-[0_0_20px_rgba(255,255,255,0.1)] transition-all hover:scale-105 active:scale-95"
+                  className="relative inline-flex items-stretch overflow-visible"
                 >
-                  <div className="absolute inset-0 bg-gradient-to-r from-[#8D36D5] to-[#46067A] opacity-0 transition-opacity group-hover:opacity-10" />
-                  REGISTER NOW
-                </motion.a>
+                  <Link
+                    href="/register"
+                    className="touch-target relative group inline-flex items-center overflow-hidden whitespace-nowrap rounded-l-xl bg-white px-5 py-2.5 text-[11px] font-black uppercase tracking-[0.2em] text-black shadow-[0_0_20px_rgba(255,255,255,0.1)] transition-all hover:scale-[1.02] active:scale-95"
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-r from-[#8D36D5] to-[#46067A] opacity-0 transition-opacity group-hover:opacity-10" />
+                    REGISTER NOW
+                  </Link>
+
+                  <button
+                    type="button"
+                    onClick={() => setIsRegisterMenuOpen((prev) => !prev)}
+                    aria-expanded={isRegisterMenuOpen}
+                    aria-label="Toggle register dropdown"
+                    className="touch-target relative inline-flex w-11 items-center justify-center rounded-r-xl border-l border-black/10 bg-white text-black transition-all hover:bg-zinc-100"
+                  >
+                    <ChevronDown
+                      size={16}
+                      className={`transition-transform duration-300 ${isRegisterMenuOpen ? "rotate-180" : "rotate-0"}`}
+                    />
+                  </button>
+
+                  <AnimatePresence>
+                    {isRegisterMenuOpen && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 8, scale: 0.96 }}
+                        transition={{ duration: 0.2 }}
+                        className="absolute right-0 top-[calc(100%+0.5rem)] z-[120] min-w-[180px] rounded-xl border border-white/10 bg-black/95 p-1.5 backdrop-blur-2xl"
+                      >
+                        <Link
+                          href="/auth"
+                          onClick={() => setIsRegisterMenuOpen(false)}
+                          className="touch-target flex w-full items-center rounded-lg px-3 py-2.5 text-xs font-black uppercase tracking-[0.2em] text-zinc-200 transition-colors hover:bg-white/10 hover:text-white"
+                        >
+                          LOGIN
+                        </Link>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </motion.div>
               </li>
             </ul>
 
@@ -222,14 +285,24 @@ export default function LandingNavbar() {
               </nav>
 
               <motion.div variants={itemVariants} className="mt-16 w-full">
-                <Link
-                  href="/#register"
-                  onClick={closeMenu}
-                  className="touch-target group relative flex w-full items-center justify-center overflow-hidden rounded-2xl bg-white py-6 text-base font-black uppercase tracking-[0.4em] text-black shadow-2xl transition-all hover:scale-105 active:scale-95"
-                >
-                  <div className="absolute inset-0 bg-gradient-to-r from-[#8D36D5] to-[#46067A] opacity-0 transition-opacity group-hover:opacity-10" />
-                  REGISTER NOW
-                </Link>
+                <div className="grid gap-3">
+                  <Link
+                    href="/register"
+                    onClick={closeMenu}
+                    className="touch-target group relative flex w-full items-center justify-center overflow-hidden rounded-2xl bg-white py-6 text-base font-black uppercase tracking-[0.4em] text-black shadow-2xl transition-all hover:scale-105 active:scale-95"
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-r from-[#8D36D5] to-[#46067A] opacity-0 transition-opacity group-hover:opacity-10" />
+                    REGISTER NOW
+                  </Link>
+
+                  <Link
+                    href="/auth"
+                    onClick={closeMenu}
+                    className="touch-target flex w-full items-center justify-center rounded-2xl border border-white/10 bg-white/5 py-4 text-sm font-black uppercase tracking-[0.3em] text-white transition-colors hover:bg-white/10"
+                  >
+                    LOGIN
+                  </Link>
+                </div>
                 <div className="mt-8 flex items-center justify-center gap-4 text-[8px] font-bold tracking-[0.4em] text-zinc-600 uppercase">
                   <div className="h-[1px] w-6 bg-zinc-800" />
                   Secure Terminal Protocol 0x4f

@@ -3,12 +3,15 @@
 import Image from "next/image";
 import { motion, useMotionValue, useSpring, useTransform, useScroll } from "framer-motion";
 import { useEffect, useState } from "react";
+import Link from "next/link";
+import { ChevronDown } from "lucide-react";
 import { MagneticWrapper } from "../ui/magnetic-wrapper";
 import { TextReveal } from "../ui/text-reveal";
 import { GlowTypewriter } from "../ui/glow-typewriter";
 
 export default function HeroSection() {
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+  const [isRegisterMenuOpen, setIsRegisterMenuOpen] = useState(false);
 
   // 3D Card Animation Values
   const x = useMotionValue(0);
@@ -44,6 +47,29 @@ export default function HeroSection() {
     return () => window.removeEventListener("mousemove", handleMouseMove);
   }, [x, y]);
 
+  useEffect(() => {
+    const handleOutsideClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest("[data-hero-register-dropdown]")) {
+        setIsRegisterMenuOpen(false);
+      }
+    };
+
+    const handleEsc = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsRegisterMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleOutsideClick);
+    document.addEventListener("keydown", handleEsc);
+
+    return () => {
+      document.removeEventListener("mousedown", handleOutsideClick);
+      document.removeEventListener("keydown", handleEsc);
+    };
+  }, []);
+
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
@@ -67,7 +93,7 @@ export default function HeroSection() {
   return (
     <section 
       id="hero" 
-      className="relative flex min-h-[92dvh] flex-col items-center justify-center overflow-hidden pb-10 pt-24 scroll-mt-28 sm:grid sm:grid-cols-2 sm:gap-10 sm:pt-28"
+      className="relative flex min-h-[92dvh] flex-col items-center justify-center overflow-x-hidden pb-10 pt-24 scroll-mt-28 sm:grid sm:grid-cols-2 sm:gap-10 sm:pt-28"
     >
       {/* Precision HUD Background Layer */}
       <div className="absolute inset-0 z-0 opacity-20 pointer-events-none">
@@ -133,17 +159,53 @@ export default function HeroSection() {
           className="mt-14 flex flex-col items-center justify-center gap-6 sm:items-start"
         >
           <MagneticWrapper>
-            <motion.a
-              href="/auth"
+            <motion.div
+              data-hero-register-dropdown
               animate={{
                 boxShadow: ["0 0 20px rgba(141,54,213,0.3)", "0 0 40px rgba(141,54,213,0.5)", "0 0 20px rgba(141,54,213,0.3)"],
               }}
               transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-              className="touch-target group relative overflow-hidden rounded-2xl bg-white px-8 py-4 text-xs font-black tracking-[0.2em] text-black shadow-[0_0_30px_rgba(255,255,255,0.1)] transition-all hover:scale-105 active:scale-95 sm:px-12 sm:py-6 sm:text-sm"
+              className="relative inline-flex items-stretch overflow-visible"
             >
-              <div className="absolute inset-0 bg-gradient-to-r from-[#8D36D5] to-[#46067A] opacity-0 transition-opacity group-hover:opacity-10" />
-              REGISTER NOW
-            </motion.a>
+              <Link
+                href="/register"
+                className="touch-target relative group inline-flex items-center overflow-hidden whitespace-nowrap rounded-l-2xl bg-white px-8 py-4 text-xs font-black tracking-[0.2em] text-black shadow-[0_0_30px_rgba(255,255,255,0.1)] transition-all hover:scale-[1.02] active:scale-95 sm:px-12 sm:py-6 sm:text-sm"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-[#8D36D5] to-[#46067A] opacity-0 transition-opacity group-hover:opacity-10" />
+                REGISTER NOW
+              </Link>
+
+              <button
+                type="button"
+                onClick={() => setIsRegisterMenuOpen((prev) => !prev)}
+                aria-expanded={isRegisterMenuOpen}
+                aria-label="Toggle register dropdown"
+                className="touch-target relative inline-flex w-11 items-center justify-center rounded-r-2xl border-l border-black/10 bg-white text-black transition-all hover:bg-zinc-100"
+              >
+                <ChevronDown
+                  size={16}
+                  className={`transition-transform duration-300 ${isRegisterMenuOpen ? "rotate-180" : "rotate-0"}`}
+                />
+              </button>
+
+              {isRegisterMenuOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 8, scale: 0.96 }}
+                  transition={{ duration: 0.2 }}
+                  className="absolute right-0 top-[calc(100%+0.5rem)] z-50 min-w-[180px] rounded-xl border border-white/10 bg-black/95 p-1.5 backdrop-blur-2xl"
+                >
+                  <Link
+                    href="/auth"
+                    onClick={() => setIsRegisterMenuOpen(false)}
+                    className="touch-target flex w-full items-center rounded-lg px-3 py-2.5 text-xs font-black uppercase tracking-[0.2em] text-zinc-200 transition-colors hover:bg-white/10 hover:text-white"
+                  >
+                    LOGIN
+                  </Link>
+                </motion.div>
+              )}
+            </motion.div>
           </MagneticWrapper>
 
           <div className="flex items-center gap-3">
