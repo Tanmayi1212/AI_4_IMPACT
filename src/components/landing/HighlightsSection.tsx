@@ -24,7 +24,7 @@ export default function HighlightsSection() {
       </motion.div>
 
       <div className="grid gap-6 md:grid-cols-3">
-        <motion.article 
+        <motion.article
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
@@ -34,7 +34,7 @@ export default function HighlightsSection() {
           <div className="absolute inset-0 bg-gradient-to-r from-fuchsia-500/10 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
           <p className="text-xs font-bold tracking-[0.4em] text-fuchsia-400 uppercase">Grand Prize Pool</p>
           <h3 className="mt-4 text-5xl font-black tracking-tighter text-white sm:text-7xl lg:text-8xl">
-            Rs. 2,00,000<span className="text-fuchsia-500">+</span>
+            Rs. 1,00,000<span className="text-fuchsia-500"></span>
           </h3>
           <div className="mt-8 flex items-center gap-4">
             <div className="h-px flex-1 bg-white/10" />
