@@ -12,6 +12,7 @@ const RETRYABLE_STATES = new Set(["ERROR", "RETRY"]);
 const MIN_STALE_MINUTES = 1;
 const MAX_STALE_MINUTES = 240;
 const DEFAULT_STALE_MINUTES = 20;
+const BOOTSTRAP_PASSWORD_SUFFIX = "Aa1!";
 
 class CredentialEmailError extends Error {
   constructor(status, code, message, details = {}) {
@@ -109,6 +110,68 @@ function toDateSafe(value) {
 function toIso(value) {
   const date = toDateSafe(value);
   return date ? date.toISOString() : null;
+}
+
+function toAuthErrorCode(error) {
+  return asTrimmedString(error?.code).toLowerCase();
+}
+
+function mapAuthErrorToCredentialEmailError(error) {
+  const code = toAuthErrorCode(error);
+
+  if (!code.startsWith("auth/")) {
+    return null;
+  }
+
+  if (code === "auth/user-not-found") {
+    return new CredentialEmailError(
+      409,
+      "TEAM_LOGIN_NOT_PROVISIONED",
+      "Team login account was not found. Regenerate credentials and retry email dispatch."
+    );
+  }
+
+  if (code === "auth/invalid-email") {
+    return new CredentialEmailError(
+      400,
+      "INVALID_LEADER_EMAIL",
+      "Leader email in access credentials is invalid."
+    );
+  }
+
+  if (code === "auth/email-already-exists") {
+    return new CredentialEmailError(
+      409,
+      "LEADER_EMAIL_CONFLICT",
+      "Leader email is already associated with another auth account."
+    );
+  }
+
+  if (code === "auth/operation-not-allowed") {
+    return new CredentialEmailError(
+      503,
+      "PASSWORD_PROVIDER_DISABLED",
+      "Email/password authentication is disabled in Firebase Auth."
+    );
+  }
+
+  if (code === "auth/too-many-requests") {
+    return new CredentialEmailError(
+      429,
+      "AUTH_RATE_LIMIT",
+      "Firebase Auth rate limit reached while generating reset link. Retry shortly."
+    );
+  }
+
+  return new CredentialEmailError(
+    503,
+    "AUTH_BACKEND_ERROR",
+    "Firebase Auth is temporarily unavailable. Retry shortly."
+  );
+}
+
+function buildBootstrapPassword() {
+  return `${randomUUID()}${BOOTSTRAP_PASSWORD_SUFFIX}`;
 }
 
 function escapeHtml(value) {
@@ -260,8 +323,16 @@ function parseCredentialIdentity(registrationData) {
   const teamId = asTrimmedString(
     registrationData.team_access_id || rawAccess.team_id
   ).toLowerCase();
+  const authUid = asTrimmedString(
+    registrationData.team_lead_auth_uid || rawAccess.auth_uid
+  );
   const leaderEmail = asNormalizedEmail(rawAccess.leader_email);
   const leaderName = asTrimmedString(rawAccess.leader_name);
+  const leaderParticipantId = asTrimmedString(
+    Array.isArray(registrationData.member_ids)
+      ? registrationData.member_ids[0]
+      : ""
+  );
 
   if (!teamId) {
     throw new CredentialEmailError(
@@ -281,9 +352,132 @@ function parseCredentialIdentity(registrationData) {
 
   return {
     teamId,
+    authUid,
     leaderEmail,
     leaderName,
+    leaderParticipantId,
     rawAccess,
+  };
+}
+
+async function getAuthUserByUid(uid) {
+  const normalizedUid = asTrimmedString(uid);
+  if (!normalizedUid) return null;
+
+  try {
+    return await adminAuth.getUser(normalizedUid);
+  } catch (error) {
+    if (toAuthErrorCode(error) === "auth/user-not-found") {
+      return null;
+    }
+
+    const mapped = mapAuthErrorToCredentialEmailError(error);
+    if (mapped) {
+      throw mapped;
+    }
+
+    throw error;
+  }
+}
+
+async function getAuthUserByEmail(email) {
+  const normalizedEmail = asNormalizedEmail(email);
+  if (!normalizedEmail) return null;
+
+  try {
+    return await adminAuth.getUserByEmail(normalizedEmail);
+  } catch (error) {
+    if (toAuthErrorCode(error) === "auth/user-not-found") {
+      return null;
+    }
+
+    const mapped = mapAuthErrorToCredentialEmailError(error);
+    if (mapped) {
+      throw mapped;
+    }
+
+    throw error;
+  }
+}
+
+function assertNonAdminAuthUser(userRecord) {
+  if (userRecord?.customClaims?.admin === true) {
+    throw new CredentialEmailError(
+      409,
+      "LEADER_EMAIL_IS_ADMIN",
+      "Leader email belongs to an admin account. Use a non-admin team leader email."
+    );
+  }
+}
+
+async function ensureCredentialEmailAuthUser({
+  registrationIdentity,
+  registrationRefId,
+}) {
+  const emailUser = await getAuthUserByEmail(registrationIdentity.leaderEmail);
+  let userRecord = emailUser;
+
+  if (!userRecord) {
+    const uidUser = await getAuthUserByUid(registrationIdentity.authUid);
+    if (
+      uidUser &&
+      asNormalizedEmail(uidUser.email) === registrationIdentity.leaderEmail
+    ) {
+      userRecord = uidUser;
+    }
+  }
+
+  let created = false;
+  if (!userRecord) {
+    try {
+      userRecord = await adminAuth.createUser({
+        email: registrationIdentity.leaderEmail,
+        password: buildBootstrapPassword(),
+        displayName: registrationIdentity.leaderName || registrationIdentity.teamId,
+        disabled: false,
+      });
+      created = true;
+    } catch (error) {
+      const mapped = mapAuthErrorToCredentialEmailError(error);
+      if (mapped) {
+        throw mapped;
+      }
+
+      throw error;
+    }
+  }
+
+  assertNonAdminAuthUser(userRecord);
+
+  if (created) {
+    try {
+      const existingClaims = userRecord.customClaims || {};
+      const claims = {
+        ...existingClaims,
+        role: "TEAM_LEAD",
+        team_access_id: registrationIdentity.teamId,
+        registration_ref: registrationRefId,
+        must_reset_password: true,
+      };
+
+      if (registrationIdentity.leaderParticipantId) {
+        claims.participant_id = registrationIdentity.leaderParticipantId;
+      }
+
+      await adminAuth.setCustomUserClaims(userRecord.uid, claims);
+    } catch (error) {
+      const mapped = mapAuthErrorToCredentialEmailError(error);
+      if (mapped) {
+        throw mapped;
+      }
+
+      throw error;
+    }
+  }
+
+  return {
+    ...registrationIdentity,
+    authUid: userRecord.uid,
   };
 }
 
@@ -467,7 +661,11 @@ export async function queueCredentialEmail({
       .collection("hackathon_registrations")
       .doc(queueContext.registrationRefId);
     const registrationDoc = await registrationRef.get();
-    const registrationIdentity = parseCredentialIdentity(registrationDoc.data());
+    let registrationIdentity = parseCredentialIdentity(registrationDoc.data());
+    registrationIdentity = await ensureCredentialEmailAuthUser({
+      registrationIdentity,
+      registrationRefId: queueContext.registrationRefId,
+    });
 
     const loginUrl = buildLoginUrl(requestOrigin);
     const setupLink = await generateSetupLink(registrationIdentity.leaderEmail, loginUrl);
@@ -533,6 +731,7 @@ export async function queueCredentialEmail({
           transaction_id: normalizedTransactionId,
           registration_ref: txContext.registrationRefId,
           team_id: identity.teamId,
+          auth_uid: registrationIdentity.authUid || null,
           recipient_email: identity.leaderEmail,
           requested_by: normalizedAdminUid,
           request_id: requestId,
@@ -543,9 +742,11 @@ export async function queueCredentialEmail({
       });
 
       const updates = {
+        team_lead_auth_uid: registrationIdentity.authUid,
         "access_credentials.team_id": identity.teamId,
         "access_credentials.leader_email": identity.leaderEmail,
         "access_credentials.leader_name": identity.leaderName || null,
+        "access_credentials.auth_uid": registrationIdentity.authUid,
         "access_credentials.email_delivery.collection": EMAIL_QUEUE_COLLECTION,
         "access_credentials.email_delivery.queue_doc_id": mailRef.id,
         "access_credentials.email_delivery.recipient": identity.leaderEmail,
@@ -609,6 +810,17 @@ export async function queueCredentialEmail({
         code: error.code,
         error: error.message,
         ...(error.details || {}),
+      };
+    }
+
+    const mapped = mapAuthErrorToCredentialEmailError(error);
+    if (mapped) {
+      return {
+        success: false,
+        status: mapped.status,
+        code: mapped.code,
+        error: mapped.message,
+        ...(mapped.details || {}),
       };
     }
 
