@@ -2,12 +2,8 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-    --font-geist-sans: "Segoe UI", "Helvetica Neue", Helvetica, Arial, sans-serif;
-    --font-geist-mono: "Consolas", "Courier New", monospace;
-    --font-syne: "Franklin Gothic Medium", "Arial Narrow", Arial, sans-serif;
-    --font-dm-mono: "Consolas", "Lucida Console", monospace;
-    --font-dm-sans: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    --font-heading: var(--font-outfit), sans-serif;
+    --font-body: var(--font-inter), sans-serif;
     --bg-dark: #050505;
     --bg-light: #F4F4F5;
     --neon-pink: #8D36D5;
@@ -17,9 +13,7 @@
     --danger-red: #FF2A2A;
     --border-color: #FFFFFF;
     --text-main: #FFFFFF;
-    --text-muted: #BBBBBB;
-    --font-heading: 'Xirod', sans-serif;
-    --font-body: 'Carbon Plus', 'Inter', monospace;
+    --text-muted: #A1A1AA;
 }
 
 * {
@@ -37,12 +31,12 @@ body {
     background-color: var(--bg-dark);
     color: var(--text-main);
     font-family: var(--font-body);
-    line-height: 1.5;
+    font-size: 16px;
+    line-height: 1.6;
     overflow-x: hidden;
-    text-transform: uppercase;
     background-image:
-        linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+        linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
     background-size: 40px 40px;
 }
 

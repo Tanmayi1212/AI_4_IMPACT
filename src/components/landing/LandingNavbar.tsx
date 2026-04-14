@@ -98,10 +98,10 @@ export default function LandingNavbar() {
               <li className="ml-6">
                 <a
                   href="#register"
-                  className="relative group overflow-hidden rounded-xl bg-white px-8 py-3 text-[10px] font-black uppercase tracking-[0.3em] text-black transition-all hover:scale-105 active:scale-95 shadow-[0_0_20px_rgba(255,255,255,0.1)]"
+                  className="relative group overflow-hidden rounded-xl bg-white px-8 py-3 text-sm font-black uppercase tracking-[0.2em] text-black transition-all hover:scale-105 active:scale-95 shadow-[0_0_20px_rgba(255,255,255,0.1)]"
                 >
                   <div className="absolute inset-0 bg-gradient-to-r from-[#8D36D5] to-[#46067A] opacity-0 transition-opacity group-hover:opacity-10" />
-                  AUTH_ACCESS
+                  REGISTER NOW
                 </a>
               </li>
             </ul>
@@ -150,7 +150,7 @@ export default function LandingNavbar() {
                         onClick={() => setIsOpen(false)}
                         className="flex w-full items-center justify-center rounded-2xl bg-white py-5 text-sm font-black uppercase tracking-[0.4em] text-black shadow-2xl"
                       >
-                        INITIALIZE_REG
+                        REGISTER NOW
                       </a>
                     </li>
                   </ul>

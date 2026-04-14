@@ -102,14 +102,14 @@ export default function HeroSection() {
         >
           <a
             href="/auth"
-            className="group relative overflow-hidden rounded-2xl bg-white px-10 py-5 text-xs font-black tracking-[0.2em] text-black transition-all hover:scale-105 active:scale-95"
+            className="group relative overflow-hidden rounded-2xl bg-white px-10 py-5 text-sm font-black tracking-[0.2em] text-black transition-all hover:scale-105 active:scale-95"
           >
             <div className="absolute inset-0 bg-gradient-to-r from-[#8D36D5] to-[#46067A] opacity-0 transition-opacity group-hover:opacity-10" />
-            INITIALIZE_REGISTRATION
+            REGISTER NOW
           </a>
           <div className="flex flex-col">
             <p className="text-[10px] font-black tracking-[0.5em] text-[#8D36D5] uppercase">TIMELINE_STATUS</p>
-            <p className="text-sm font-bold tracking-widest text-white mt-1">JUNE 24 - JUNE 26, 2026</p>
+            <p className="text-base font-bold tracking-widest text-white mt-1">JUNE 24 - JUNE 26, 2026</p>
           </div>
         </motion.div>
       </motion.div>
