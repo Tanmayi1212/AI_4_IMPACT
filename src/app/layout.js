@@ -1,11 +1,7 @@
 import "./globals.css";
 import SmoothScroll from "../components/SmoothScroll";
 import { CustomHUDScrollbar } from "../components/ui/custom-hud-scrollbar";
-import { Inter, Outfit } from "next/font/google";
-
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
-const outfit = Outfit({ subsets: ["latin"], variable: "--font-outfit" });
-
+import LandingNavbar from "../components/landing/LandingNavbar";
 export const metadata = {
   title: "AI 4 Impact | CBIT",
   description: "Learn. Build. Impact.",
@@ -25,7 +21,8 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en" suppressHydrationWarning className="scroll-smooth">
-      <body suppressHydrationWarning className={`${inter.variable} ${outfit.variable} antialiased selection:bg-fuchsia-500/30 selection:text-fuchsia-200`}>
+      <body suppressHydrationWarning className="antialiased selection:bg-fuchsia-500/30 selection:text-fuchsia-200">
+        <LandingNavbar />
         <SmoothScroll>{children}</SmoothScroll>
       </body>
     </html>

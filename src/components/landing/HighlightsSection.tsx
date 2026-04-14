@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 
 export default function HighlightsSection() {
   return (
-    <section id="highlights" className="py-8 lg:py-12">
+    <section id="highlights" className="py-20 sm:py-32">
       <motion.div
         initial={{ opacity: 0, x: -20 }}
         whileInView={{ opacity: 1, x: 0 }}
@@ -12,7 +12,7 @@ export default function HighlightsSection() {
         transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
         className="mb-10"
       >
-        <h2 className="text-4xl font-black uppercase tracking-tighter text-white sm:text-6xl lg:text-7xl">
+        <h2 className="text-2xl font-black uppercase tracking-tighter text-white sm:text-5xl lg:text-7xl">
           THE <span className="bg-gradient-to-r from-[#8D36D5] to-[#46067A] bg-clip-text text-transparent italic">IMPACT</span>
         </h2>
       </motion.div>
@@ -23,7 +23,7 @@ export default function HighlightsSection() {
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
         transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-        className="group relative flex min-h-[200px] w-full flex-col items-center justify-center p-6 md:min-h-[260px] md:p-10"
+        className="group relative flex min-h-[200px] w-full flex-col items-center justify-center p-0 md:min-h-[260px] md:p-10"
       >
         <svg
           className="absolute inset-0 h-full w-full drop-shadow-[0_0_15px_rgba(141,54,213,0.2)] transition-all duration-500 group-hover:drop-shadow-[0_0_25px_rgba(141,54,213,0.5)]"
@@ -53,7 +53,7 @@ export default function HighlightsSection() {
           <path d="M1600,340 L1540,400" stroke="#c084fc" strokeWidth="6" className="opacity-70 group-hover:opacity-100 transition-opacity duration-500" />
         </svg>
 
-        <h3 className="relative z-10 mt-4 text-center text-4xl font-black tracking-tighter text-white sm:text-6xl lg:text-[6.5rem]">
+        <h3 className="relative z-10 mt-4 text-center text-3xl font-black tracking-tighter text-white sm:text-5xl lg:text-6xl">
           Rs. 1,00,000<span className="text-[#a855f7]">+</span>
         </h3>
         

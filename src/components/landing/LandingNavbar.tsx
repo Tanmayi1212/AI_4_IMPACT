@@ -5,12 +5,12 @@ import { Menu, X } from "lucide-react";
 import { motion, AnimatePresence, useScroll, useSpring } from "framer-motion";
 
 const navItems = [
-  { label: "Home", href: "#hero" },
-  { label: "About", href: "#about" },
-  { label: "Events", href: "#events" },
-  { label: "Timeline", href: "#timeline" },
-  { label: "Highlights", href: "#highlights" },
-  { label: "Sponsors", href: "#sponsors" },
+  { label: "Home", href: "/#hero" },
+  { label: "About", href: "/#about" },
+  { label: "Events", href: "/#events" },
+  { label: "Timeline", href: "/#timeline" },
+  { label: "Highlights", href: "/#highlights" },
+  { label: "Sponsors", href: "/#sponsors" },
 ];
 
 export default function LandingNavbar() {
@@ -109,12 +109,12 @@ export default function LandingNavbar() {
         <nav className={`relative overflow-hidden rounded-[2rem] border border-white/10 transition-all duration-500 ${
           scrolled || isOpen ? "bg-black/95 backdrop-blur-2xl shadow-2xl" : "bg-black/40 backdrop-blur-lg"
         } px-6 py-4`}>
-          {/* Animated Background Glow */}
-          <div className="absolute -left-20 -top-20 h-40 w-40 bg-fuchsia-600/10 blur-3xl" />
+          {/* Animated Background Glow - Hidden on very small screens to prevent overflow */}
+          <div className="absolute -left-20 -top-20 h-40 w-40 bg-fuchsia-600/10 blur-3xl hidden sm:block" />
           
           <div className="relative z-10 flex items-center justify-between">
             {/* Logo */}
-            <a href="#hero" onClick={closeMenu} className="group flex items-center gap-2 text-base font-black uppercase tracking-[0.2em] text-white sm:text-2xl sm:gap-3 sm:tracking-[0.3em]">
+            <a href="/#hero" onClick={closeMenu} className="group flex items-center gap-1.5 text-lg font-black uppercase tracking-[0.1em] text-white sm:text-2xl sm:gap-3 sm:tracking-[0.3em]">
               <span className="bg-gradient-to-r from-[#8D36D5] to-[#46067A] bg-clip-text text-transparent transition-all group-hover:scale-105">AI4</span>
               <span className="inline">IMPACT</span>
               <div className="h-1 w-1 rounded-full bg-cyan-400 animate-pulse hidden sm:block" />
@@ -146,7 +146,7 @@ export default function LandingNavbar() {
               })}
               <li className="ml-6">
                 <motion.a
-                  href="#register"
+                  href="/#register"
                   animate={{ 
                     boxShadow: ["0 0 10px rgba(141,54,213,0.2)", "0 0 25px rgba(141,54,213,0.4)", "0 0 10px rgba(141,54,213,0.2)"],
                   }}
@@ -159,10 +159,9 @@ export default function LandingNavbar() {
               </li>
             </ul>
 
-            {/* Mobile Menu Button */}
             <button 
               onClick={toggleMenu}
-              className="group relative z-[100] flex h-12 w-12 items-center justify-center rounded-2xl bg-white/5 text-white transition-all hover:bg-white/10 lg:hidden"
+              className="group relative z-[100] flex h-10 w-10 items-center justify-center rounded-xl bg-white/5 text-white transition-all hover:bg-white/10 lg:hidden sm:h-12 sm:w-12 sm:rounded-2xl"
             >
               <AnimatePresence mode="wait">
                 <motion.div
@@ -223,7 +222,7 @@ export default function LandingNavbar() {
 
               <motion.div variants={itemVariants} className="mt-16 w-full">
                 <a
-                  href="#register"
+                   href="/#register"
                   onClick={closeMenu}
                   className="group relative flex w-full items-center justify-center overflow-hidden rounded-2xl bg-white py-6 text-base font-black uppercase tracking-[0.4em] text-black shadow-2xl transition-all hover:scale-105 active:scale-95"
                 >

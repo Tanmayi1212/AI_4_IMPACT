@@ -50,19 +50,19 @@ export default function AboutSection() {
     <section
       id="about"
       ref={containerRef}
-      className="relative py-12 lg:py-16 overflow-hidden scroll-mt-32"
+      className="relative py-20 sm:py-32 overflow-hidden scroll-mt-32"
     >
       {/* Subtle Background Texture */}
       <div className="absolute inset-0 opacity-[0.03] bg-[radial-gradient(circle_at_center,_#fff_1px,_transparent_1px)] bg-[length:40px_40px] pointer-events-none" />
 
       <motion.div
         style={{ x: xText }}
-        className="absolute top-20 whitespace-nowrap text-[12vw] font-black uppercase tracking-tighter text-white/[0.02] pointer-events-none select-none"
+        className="absolute top-20 whitespace-nowrap text-[15vw] font-black uppercase tracking-tighter text-white/[0.05] pointer-events-none select-none"
       >
-        AI_4_IMPACT // REGISTER_NOW
+        AI_4_IMPACT // REGISTER_NOW // BUILD_THE_FUTURE
       </motion.div>
 
-      <div className="relative z-10 max-w-7xl mx-auto px-6 sm:px-8 lg:px-12">
+      <div className="relative z-10 max-w-7xl mx-auto px-0 sm:px-8 lg:px-12">
         {/* Header Block */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -74,7 +74,7 @@ export default function AboutSection() {
           <div className="mb-6 h-[1px] w-12 bg-[#8D36D5]" />
           <TextReveal 
             text="THE WHY"
-            className="text-5xl font-black uppercase tracking-tighter text-white sm:text-7xl lg:text-8xl leading-[0.85]"
+            className="text-3xl font-black uppercase tracking-tighter text-white sm:text-7xl lg:text-8xl leading-[0.85]"
           />
         </motion.div>
 
@@ -118,18 +118,18 @@ export default function AboutSection() {
                 style={{ rotateX, rotateY, transformStyle: "preserve-3d" }}
                 className="lg:col-span-6 group relative"
               >
-                <div className="absolute -inset-[1px] rounded-[2rem] bg-gradient-to-br from-[#8D36D5]/20 to-transparent opacity-50 group-hover:opacity-100 transition-opacity" />
-                <div className="relative h-full overflow-hidden rounded-[2rem] border border-white/5 bg-white/[0.03] p-6 sm:p-12 backdrop-blur-sm transition-all duration-500 group-hover:bg-white/[0.05]">
-                  <div className="scanning-ray opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className="absolute -inset-[1px] rounded-[2rem] bg-gradient-to-br from-[#8D36D5]/20 to-transparent opacity-50 sm:group-hover:opacity-100 transition-opacity" />
+                <div className="relative h-full overflow-hidden rounded-[2rem] border border-white/5 bg-white/[0.03] p-6 sm:p-12 backdrop-blur-sm transition-all duration-500 sm:group-hover:bg-white/[0.05]">
+                  <div className="scanning-ray opacity-40 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity" />
 
                   <div className="flex justify-between items-start mb-8 relative z-10" style={{ transform: "translateZ(30px)" }}>
                     <span className="text-[10px] font-black tracking-[0.3em] text-[#8D36D5]">{pillar.tag}</span>
-                    <span className="text-4xl font-black text-white/10 group-hover:text-[#8D36D5]/20 transition-colors">/{pillar.index}</span>
+                    <span className="text-3xl font-black text-white/10 sm:text-4xl sm:group-hover:text-[#8D36D5]/20 transition-colors">/{pillar.index}</span>
                   </div>
-                  <h3 className="text-3xl font-black uppercase tracking-tight text-white mb-6 group-hover:animate-glitch relative z-10" style={{ transform: "translateZ(40px)" }}>
+                  <h3 className="text-xl font-black uppercase tracking-tight text-white mb-4 group-hover:animate-glitch relative z-10 sm:text-4xl sm:mb-6" style={{ transform: "translateZ(40px)" }}>
                     {pillar.title}
                   </h3>
-                  <p className="text-lg text-zinc-400 leading-relaxed font-medium relative z-10" style={{ transform: "translateZ(20px)" }}>
+                  <p className="text-sm text-zinc-400 leading-relaxed font-medium relative z-10 sm:text-base lg:text-lg" style={{ transform: "translateZ(20px)" }}>
                     {pillar.text}
                   </p>
                   <div className="mt-10 h-[1px] w-12 bg-white/10 group-hover:w-full group-hover:bg-[#8D36D5]/50 transition-all duration-1000 relative z-10" />
@@ -148,18 +148,18 @@ export default function AboutSection() {
               transition={{ duration: 0.5, delay: 0.3 + (i * 0.1), ease: [0.16, 1, 0.3, 1] }}
               className="lg:col-span-4 group relative"
             >
-              <div className="relative h-full overflow-hidden rounded-[1.5rem] border border-white/5 bg-white/[0.02] p-6 transition-all hover:bg-white/[0.04] sm:p-8">
+              <div className="relative h-full overflow-hidden rounded-[1.5rem] border border-white/5 bg-white/[0.02] p-6 transition-all sm:hover:bg-white/[0.04] sm:p-8">
                 {/* HUD Scan Effect */}
-                <div className="scanning-ray opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className="scanning-ray opacity-40 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity" />
 
                 <div className="flex items-center gap-3 mb-4 relative z-10">
                   <div className="h-1.5 w-1.5 rounded-full bg-[#8D36D5] animate-pulse" />
                   <span className="text-[9px] font-bold tracking-[0.4em] text-zinc-500 uppercase">{cap.icon}</span>
                 </div>
-                <h4 className="text-xl font-black uppercase tracking-wide text-white mb-3 relative z-10">
+                <h4 className="text-lg font-black uppercase tracking-wide text-white mb-2 relative z-10 sm:text-xl sm:mb-3">
                   {cap.label}
                 </h4>
-                <p className="text-sm text-zinc-500 leading-relaxed relative z-10">
+                <p className="text-xs text-zinc-500 leading-relaxed relative z-10 sm:text-sm">
                   {cap.desc}
                 </p>
 

@@ -136,88 +136,162 @@ export default function ParticipantDashboard() {
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: "var(--bg-dark)", padding: "2rem" }}>
-      <div style={{ maxWidth: "980px", margin: "0 auto" }}>
-        <h1 style={{ fontFamily: "var(--font-heading)", marginBottom: "1rem" }}>
-          PARTICIPANT DASHBOARD
-        </h1>
-        <p style={{ color: "var(--neon-cyan)", marginBottom: "1.5rem" }}>
-          CURRENT PHASE: {phase}
-        </p>
+    <div className="min-h-screen bg-black pt-32 pb-20 px-0">
+      <div className="max-w-7xl mx-auto px-0 sm:px-8 lg:px-12">
+        <div className="px-6 mb-12 sm:px-0">
+          <h1 className="text-3xl font-black uppercase tracking-tighter text-white sm:text-7xl lg:text-8xl">
+            PARTICIPANT<br className="sm:hidden" /> DASHBOARD
+          </h1>
+          <p className="mt-4 text-sm font-bold tracking-[0.3em] text-[#00FFFF] uppercase sm:text-lg">
+            CURRENT PHASE: {phase}
+          </p>
+          <div className="mt-6 h-[1px] w-12 bg-[#8D36D5]" />
+        </div>
 
-        {phase === "REGISTRATION" && (
-          <div className="cyber-card" style={{ padding: "1rem", marginBottom: "1rem" }}>
-            <h3>[ REGISTRATION STATUS ]</h3>
-            <p>PAYMENT: {team?.payment?.status || "PENDING"}</p>
-            <p>TEAM MEMBERS: {Array.isArray(team?.members) ? team.members.length : 0}</p>
-          </div>
-        )}
+        <div className="grid grid-cols-1 gap-8">
+          {phase === "REGISTRATION" && (
+            <div className="cyber-card group p-8 bg-white/[0.03] backdrop-blur-3xl border border-white/5 rounded-[2rem] overflow-hidden relative">
+              <div className="scanning-ray opacity-20" />
+              <div className="flex justify-between items-start mb-8">
+                <span className="text-[10px] font-black tracking-[0.3em] text-[#8D36D5]">STATUS_REPORT</span>
+                <span className="text-2xl font-black text-white/10 uppercase">/01</span>
+              </div>
+              <h3 className="text-xl font-black uppercase tracking-tight text-white mb-6 sm:text-3xl">
+                REGISTRATION STATUS
+              </h3>
+              <div className="space-y-4 font-medium">
+                <p className="text-sm sm:text-lg">
+                  <span className="text-zinc-500 uppercase tracking-widest text-xs mr-4">PAYMENT:</span> 
+                  <span className={team?.payment?.status === "SUCCESS" ? "text-cyan-400" : "text-fuchsia-500"}>
+                    {team?.payment?.status || "PENDING"}
+                  </span>
+                </p>
+                <p className="text-sm sm:text-lg">
+                  <span className="text-zinc-500 uppercase tracking-widest text-xs mr-4">TEAM MEMBERS:</span> 
+                  {Array.isArray(team?.members) ? team.members.length : 0}
+                </p>
+              </div>
+            </div>
+          )}
 
-        {phase === "PS_SELECTION" && (
-          <div className="cyber-card" style={{ padding: "1rem", marginBottom: "1rem" }}>
-            <h3>[ PROBLEM STATEMENT ]</h3>
-            {team?.psSelection?.selected ? (
-              <p>LOCKED PS: {team?.psSelection?.problemStatementId || "N/A"}</p>
-            ) : (
-              <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+          {phase === "PS_SELECTION" && (
+            <div className="cyber-card group p-8 bg-white/[0.03] backdrop-blur-3xl border border-white/5 rounded-[2rem] overflow-hidden relative">
+              <div className="scanning-ray opacity-20" />
+              <div className="flex justify-between items-start mb-8">
+                <span className="text-[10px] font-black tracking-[0.3em] text-[#8D36D5]">PROTOCOL_ENTRY</span>
+                <span className="text-2xl font-black text-white/10 uppercase">/02</span>
+              </div>
+              <h3 className="text-xl font-black uppercase tracking-tight text-white mb-6 sm:text-3xl">
+                PROBLEM STATEMENT
+              </h3>
+              {team?.psSelection?.selected ? (
+                <div className="p-6 rounded-xl bg-cyan-400/5 border border-cyan-400/20">
+                  <p className="text-sm sm:text-lg text-cyan-400 font-bold">
+                    LOCKED PS: {team?.psSelection?.problemStatementId || "N/A"}
+                  </p>
+                </div>
+              ) : (
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <input
+                    value={psId}
+                    onChange={(e) => setPsId(e.target.value)}
+                    placeholder="ENTER PS_ID (e.g. FIN_01)"
+                    className="flex-1 bg-white/5 border border-white/10 rounded-xl px-6 py-4 text-white outline-none focus:border-[#8D36D5] transition-all font-bold placeholder:text-zinc-700"
+                  />
+                  <button 
+                    onClick={handlePsSelect} 
+                    disabled={busy || profile?.role !== "TEAM_LEAD"}
+                    className="btn group relative overflow-hidden px-10 py-4 bg-white text-black font-black uppercase text-xs tracking-widest rounded-xl hover:scale-105 transition-all disabled:opacity-50"
+                  >
+                    LOCK_PS()
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {phase === "ONGOING" && (
+            <div className="cyber-card group p-8 bg-white/[0.03] backdrop-blur-3xl border border-white/5 rounded-[2rem] overflow-hidden relative">
+              <div className="scanning-ray opacity-20" />
+              <div className="flex justify-between items-start mb-8">
+                <span className="text-[10px] font-black tracking-[0.3em] text-[#8D36D5]">TEMPORAL_FLUX</span>
+                <span className="text-2xl font-black text-white/10 uppercase">/03</span>
+              </div>
+              <h3 className="text-xl font-black uppercase tracking-tight text-white mb-6 sm:text-3xl">
+                LIVE TIMELINE
+              </h3>
+              <div className="space-y-4">
+                {(config?.timelineEvents || []).map((event, index) => {
+                  const now = Date.now();
+                  const start = toMillis(event?.startAt);
+                  const end = toMillis(event?.endAt);
+                  const active = Number.isFinite(start) && Number.isFinite(end) && now >= start && now <= end;
+                  return (
+                    <div 
+                      key={`${event?.title || "event"}-${index}`} 
+                      className={`flex items-center gap-4 transition-all duration-500 ${active ? "opacity-100 scale-100" : "opacity-30 blur-[1px]"}`}
+                    >
+                      <div className={`h-2 w-2 rounded-full ${active ? "bg-cyan-400 animate-pulse" : "bg-white/20"}`} />
+                      <p className={`text-sm sm:text-base font-bold tracking-wide uppercase ${active ? "text-white" : "text-zinc-500"}`}>
+                        {event?.title || "Untitled Event"}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {phase === "SUBMISSION" && (
+            <div className="cyber-card group p-8 bg-white/[0.03] backdrop-blur-3xl border border-white/5 rounded-[2rem] overflow-hidden relative">
+              <div className="scanning-ray opacity-20" />
+              <div className="flex justify-between items-start mb-8">
+                <span className="text-[10px] font-black tracking-[0.3em] text-[#8D36D5]">DATA_EXPORT</span>
+                <span className="text-2xl font-black text-white/10 uppercase">/04</span>
+              </div>
+              <h3 className="text-xl font-black uppercase tracking-tight text-white mb-6 sm:text-3xl">
+                FINAL SUBMISSION
+              </h3>
+              <div className="space-y-6">
                 <input
-                  value={psId}
-                  onChange={(e) => setPsId(e.target.value)}
-                  placeholder="Enter Problem Statement ID"
-                  style={{ flex: 1, padding: "0.6rem", background: "var(--bg-dark)", color: "var(--text-main)", border: "1px solid var(--border-color)" }}
+                  value={githubUrl}
+                  onChange={(e) => setGithubUrl(e.target.value)}
+                  placeholder="GITHUB_REPOSITORY_URL"
+                  className="w-full bg-white/5 border border-white/10 rounded-xl px-6 py-4 text-white outline-none focus:border-[#8D36D5] transition-all font-bold placeholder:text-zinc-700 disabled:opacity-50"
+                  disabled={submissionDisabled || busy}
                 />
-                <button className="btn" onClick={handlePsSelect} disabled={busy || profile?.role !== "TEAM_LEAD"}>
-                  LOCK_PS()
+                <div className="relative">
+                  <input
+                    type="file"
+                    accept=".ppt,.pptx,.pdf"
+                    onChange={(e) => setPptFile(e.target.files?.[0] || null)}
+                    disabled={submissionDisabled || busy}
+                    className="w-full text-xs text-zinc-500 file:mr-4 file:py-3 file:px-6 file:rounded-xl file:border-0 file:text-[10px] file:font-black file:uppercase file:bg-white/10 file:text-white hover:file:bg-white/20 file:cursor-pointer disabled:opacity-50"
+                  />
+                </div>
+                <button 
+                  onClick={handleSubmitProject} 
+                  disabled={submissionDisabled || busy || profile?.role !== "TEAM_LEAD"}
+                  className="btn group relative w-full overflow-hidden px-10 py-6 bg-white text-black font-black uppercase text-sm tracking-widest rounded-xl hover:scale-[1.02] transition-all disabled:opacity-20"
+                >
+                  {submissionDisabled ? "SUBMISSION_CLOSED" : "LOCKED_SUBMIT()"}
                 </button>
               </div>
-            )}
-          </div>
-        )}
+            </div>
+          )}
 
-        {phase === "ONGOING" && (
-          <div className="cyber-card" style={{ padding: "1rem", marginBottom: "1rem" }}>
-            <h3>[ LIVE TIMELINE ]</h3>
-            {(config?.timelineEvents || []).map((event, index) => {
-              const now = Date.now();
-              const start = toMillis(event?.startAt);
-              const end = toMillis(event?.endAt);
-              const active = Number.isFinite(start) && Number.isFinite(end) && now >= start && now <= end;
-              return (
-                <p key={`${event?.title || "event"}-${index}`} style={{ color: active ? "var(--neon-pink)" : "var(--text-main)" }}>
-                  {active ? ">> " : ""}{event?.title || "Untitled Event"}
-                </p>
-              );
-            })}
-          </div>
-        )}
-
-        {phase === "SUBMISSION" && (
-          <div className="cyber-card" style={{ padding: "1rem", marginBottom: "1rem" }}>
-            <h3>[ FINAL SUBMISSION ]</h3>
-            <input
-              value={githubUrl}
-              onChange={(e) => setGithubUrl(e.target.value)}
-              placeholder="GitHub Repository URL"
-              style={{ width: "100%", padding: "0.6rem", marginBottom: "0.6rem", background: "var(--bg-dark)", color: "var(--text-main)", border: "1px solid var(--border-color)" }}
-              disabled={submissionDisabled || busy}
-            />
-            <input
-              type="file"
-              accept=".ppt,.pptx,.pdf,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,application/pdf"
-              onChange={(e) => setPptFile(e.target.files?.[0] || null)}
-              disabled={submissionDisabled || busy}
-              style={{ marginBottom: "0.6rem" }}
-            />
-            <br />
-            <button className="btn" onClick={handleSubmitProject} disabled={submissionDisabled || busy || profile?.role !== "TEAM_LEAD"}>
-              {submissionDisabled ? "SUBMISSION_CLOSED" : "SUBMIT_PROJECT()"}
-            </button>
-          </div>
-        )}
-
-        {!!message && (
-          <p style={{ color: "var(--neon-cyan)", fontFamily: "monospace" }}>{message}</p>
-        )}
+          {!!message && (
+            <motion.div 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mt-8 p-6 rounded-2xl bg-[#00FFFF]/5 border border-[#00FFFF]/20"
+            >
+              <p className="text-xs font-black uppercase tracking-[0.2em] text-[#00FFFF]">
+                {">> "} {message}
+              </p>
+            </motion.div>
+          )}
+        </div>
       </div>
     </div>
   );

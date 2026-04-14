@@ -2,9 +2,41 @@
 @tailwind components;
 @tailwind utilities;
 
+@font-face {
+  font-family: 'Furore';
+  src: url('/fonts/Furore.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Carbon Plus';
+  src: url('/fonts/carbonplus-regular-bl.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Carbon Plus';
+  src: url('/fonts/carbonplus-bold-bl.otf') format('opentype');
+  font-weight: bold;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Carbon Plus';
+  src: url('/fonts/carbonplus-light-bl.otf') format('opentype');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
-    --font-heading: var(--font-outfit), sans-serif;
-    --font-body: var(--font-inter), sans-serif;
+    --font-heading: 'Furore', sans-serif;
+    --font-body: 'Carbon Plus', sans-serif;
     --bg-dark: #050505;
     --bg-light: #F4F4F5;
     --neon-pink: #8D36D5;

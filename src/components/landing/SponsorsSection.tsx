@@ -11,7 +11,7 @@ const regularSponsors = [
 
 export default function SponsorsSection() {
   return (
-    <section id="sponsors" className="py-8 lg:py-12">
+    <section id="sponsors" className="py-20 sm:py-32">
       <motion.div
         initial={{ opacity: 0, x: -20 }}
         whileInView={{ opacity: 1, x: 0 }}
@@ -19,7 +19,7 @@ export default function SponsorsSection() {
         transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
         className="mb-10 text-center md:text-left"
       >
-        <h2 className="text-4xl font-black uppercase tracking-tighter text-white sm:text-6xl lg:text-7xl">
+        <h2 className="text-3xl font-black uppercase tracking-tighter text-white sm:text-7xl lg:text-8xl">
           THE <span className="bg-gradient-to-r from-[#8D36D5] to-[#46067A] bg-clip-text text-transparent italic">PARTNERS</span>
         </h2>
       </motion.div>
@@ -30,7 +30,7 @@ export default function SponsorsSection() {
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
         transition={{ duration: 0.8 }}
-        className="group relative mx-auto mb-10 flex min-h-[140px] w-full max-w-7xl flex-col justify-center p-5 md:p-8"
+        className="group relative mx-auto mb-10 flex min-h-[140px] w-full max-w-7xl flex-col justify-center p-0 md:p-8"
       >
         {/* Themed Chamfered SVG Background */}
         <svg
@@ -62,8 +62,8 @@ export default function SponsorsSection() {
         </svg>
 
         {/* Content */}
-        <div className="relative z-10 flex flex-col items-center gap-10 text-center md:flex-row md:text-left">
-          <div className="flex h-32 w-56 shrink-0 items-center justify-center rounded-2xl border border-[#8D36D5]/30 bg-white/5 p-6 backdrop-blur-md transition-all duration-500 group-hover:bg-white/10 group-hover:scale-105">
+        <div className="relative z-10 flex flex-col items-center gap-6 text-center md:flex-row md:text-left md:gap-10">
+          <div className="flex h-24 w-44 shrink-0 items-center justify-center rounded-2xl border border-[#8D36D5]/30 bg-white/5 p-4 backdrop-blur-md transition-all duration-500 sm:h-32 sm:w-56 sm:p-6 group-hover:bg-white/10 group-hover:scale-105">
             <img 
               src="/kavion.png" 
               alt="Kavion.ai Logo" 
@@ -72,10 +72,10 @@ export default function SponsorsSection() {
           </div>
           
           <div>
-            <h3 className="mb-4 text-3xl font-black tracking-tighter text-white sm:text-4xl group-hover:animate-glitch">
+            <h3 className="mb-2 text-xl font-black tracking-tighter text-white sm:text-3xl sm:mb-4 group-hover:animate-glitch">
               Kavion.ai
             </h3>
-            <p className="max-w-3xl text-sm leading-relaxed text-zinc-400 sm:text-lg">
+            <p className="max-w-3xl text-xs leading-relaxed text-zinc-400 sm:text-lg">
               The Governed Intelligence Layer for the Enterprise. Kavion transforms unstructured, business-critical documents into continuous, validated commercial intelligence.
             </p>
           </div>

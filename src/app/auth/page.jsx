@@ -14,15 +14,9 @@ import { ROLES } from "../../../lib/constants/roles";
 
 function AuthPageFallback() {
   return (
-    <div style={{
-      minHeight: "100vh",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      background: "var(--bg-dark)",
-    }}>
-      <p style={{ color: "var(--neon-cyan)", fontFamily: "monospace", fontSize: "1.1rem" }}>
-        &gt;&gt;&gt; AUTH SYSTEM BOOTSTRAP...
+    <div className="min-h-screen flex items-center justify-center bg-black">
+      <p className="text-sm font-bold tracking-[0.4em] text-[#00FFFF] uppercase animate-pulse">
+        &gt;&gt; AUTH_SYSTEM_BOOTSTRAP...
       </p>
     </div>
   );
@@ -201,144 +195,106 @@ function AuthPageContent() {
   }
 
   return (
-    <div style={{
-      minHeight: "100vh",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      background: "var(--bg-dark)",
-      backgroundImage: `
-        linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px)
-      `,
-      backgroundSize: "40px 40px",
-      padding: "1rem",
-    }}>
-      <div className="cyber-card" style={{ width: "100%", maxWidth: "460px", padding: "2.5rem" }}>
-        <h1 style={{
-          fontFamily: "var(--font-heading)",
-          fontSize: "2.2rem",
-          textShadow: "3px 3px 0 var(--neon-pink)",
-          marginBottom: "0.6rem",
-          textAlign: "center",
-        }}>
-          AUTH<span style={{ color: "var(--neon-pink)" }}>_</span>PORTAL
-        </h1>
-        <p style={{ color: "var(--neon-cyan)", fontFamily: "monospace", fontSize: "0.82rem", textAlign: "center", marginBottom: "1.6rem" }}>
-          &gt;&gt;&gt; PUBLIC AUTHENTICATION GATEWAY
-        </p>
+    <div className="min-h-screen bg-black flex items-center justify-center p-6 relative overflow-hidden">
+      {/* Background Grids */}
+      <div className="absolute inset-0 opacity-10 pointer-events-none" 
+           style={{ backgroundImage: "linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px)", backgroundSize: "60px 60px" }} />
+      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#8D36D5] to-transparent opacity-30" />
+      
+      <div className="cyber-card w-full max-w-lg p-12 bg-white/[0.02] backdrop-blur-3xl border border-white/5 rounded-[3rem] relative group">
+        <div className="scanning-ray opacity-10" />
+        
+        <header className="text-center mb-12">
+          <h1 className="text-4xl font-black uppercase tracking-tighter mb-2 sm:text-6xl">
+            AUTH<span className="text-[#8D36D5]">_</span>PORTAL
+          </h1>
+          <p className="text-[10px] font-black tracking-[0.5em] text-[#00FFFF] uppercase">
+            &gt;&gt; SECURE_GATEWAY_NODE_v1.0
+          </p>
+        </header>
 
         {adminOnlyMessage && (
-          <p style={{
-            color: "var(--danger-red)",
-            border: "1px solid var(--danger-red)",
-            background: "rgba(255,42,42,0.1)",
-            padding: "0.6rem",
-            fontFamily: "monospace",
-            fontSize: "0.8rem",
-            marginBottom: "1rem",
-          }}>
+          <div className="mb-8 p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 font-bold text-[10px] tracking-widest uppercase">
             {adminOnlyMessage}
-          </p>
+          </div>
         )}
 
         {!authUser && (
-          <form onSubmit={handleLogin}>
-            <div style={{ marginBottom: "1rem" }}>
-              <label style={{ display: "block", marginBottom: "0.45rem", color: "var(--text-main)", fontWeight: "bold" }}>
-                [ EMAIL OR TEAM ID ]
+          <form onSubmit={handleLogin} className="space-y-6">
+            <div className="space-y-2">
+              <label className="block text-[10px] font-black text-zinc-500 tracking-[0.3em] uppercase ml-2">
+                [ IDENTIFIER_CHAIN ]
               </label>
               <input
                 type="text"
                 value={identifier}
                 onChange={(e) => setIdentifier(e.target.value)}
                 required
-                style={{
-                  width: "100%",
-                  padding: "0.75rem",
-                  background: "var(--bg-dark)",
-                  border: "2px solid var(--border-color)",
-                  color: "var(--neon-cyan)",
-                  fontFamily: "monospace",
-                }}
+                placeholder="EMAIL_OR_TEAM_ID"
+                className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-5 text-white outline-none focus:border-[#8D36D5] transition-all font-bold placeholder:text-zinc-700"
               />
-              <p style={{ color: "var(--text-muted)", fontSize: "0.72rem", marginTop: "0.35rem" }}>
-                Use admin email for admin login, or team ID (example: ai4i001) for team dashboard login.
+              <p className="text-[9px] font-bold text-zinc-600 tracking-wider ml-2">
+                * TEAM_LEAD EMAIL OR TEAM_ID (e.g. ai4i001)
               </p>
             </div>
 
-            <div style={{ marginBottom: "1rem" }}>
-              <label style={{ display: "block", marginBottom: "0.45rem", color: "var(--text-main)", fontWeight: "bold" }}>
-                [ PASSWORD ]
+            <div className="space-y-2">
+              <label className="block text-[10px] font-black text-zinc-500 tracking-[0.3em] uppercase ml-2">
+                [ PASS_KEY ]
               </label>
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                style={{
-                  width: "100%",
-                  padding: "0.75rem",
-                  background: "var(--bg-dark)",
-                  border: "2px solid var(--border-color)",
-                  color: "var(--neon-cyan)",
-                  fontFamily: "monospace",
-                }}
+                placeholder="••••••••"
+                className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-5 text-white outline-none focus:border-[#8D36D5] transition-all font-bold placeholder:text-zinc-700"
               />
             </div>
 
             {error && (
-              <p style={{
-                color: "var(--danger-red)",
-                border: "1px solid var(--danger-red)",
-                background: "rgba(255,42,42,0.1)",
-                padding: "0.6rem",
-                fontFamily: "monospace",
-                fontSize: "0.8rem",
-                marginBottom: "1rem",
-              }}>
+              <div className="p-4 rounded-xl bg-rose-500/5 border border-rose-500/10 text-rose-400 font-bold text-[10px] tracking-widest">
                 {error}
-              </p>
+              </div>
             )}
 
             <button
               type="submit"
-              className="btn"
               disabled={loading}
-              style={{ width: "100%", opacity: loading ? 0.65 : 1, cursor: loading ? "not-allowed" : "pointer" }}
+              className="w-full bg-white text-black font-black uppercase text-xs tracking-[0.4em] py-6 rounded-2xl hover:scale-[1.02] active:scale-95 transition-all shadow-2xl disabled:opacity-50"
             >
-              {loading ? "AUTHENTICATING..." : "LOGIN()"}
+              {loading ? "AUTHENTICATING..." : "INIT_HANDSHAKE()"}
             </button>
           </form>
         )}
 
         {authUser && role !== ROLES.ADMIN && (
-          <div style={{
-            border: "1px solid var(--neon-cyan)",
-            background: "rgba(0,255,255,0.06)",
-            padding: "0.9rem",
-            fontFamily: "monospace",
-            color: "var(--text-main)",
-          }}>
-            <p style={{ marginBottom: "0.45rem" }}>
-              AUTHENTICATED USER: {authUser.email}
-            </p>
-            <p style={{ marginBottom: "0.45rem" }}>
-              ROLE: {role || ROLES.PARTICIPANT}
-            </p>
-            <p style={{ color: "var(--text-muted)", fontSize: "0.8rem", marginBottom: "0.8rem" }}>
-              Admin dashboard is visible only for role ADMIN.
-            </p>
-            <button
-              onClick={() => router.push("/team")}
-              className="btn"
-              style={{ width: "100%", marginBottom: "0.6rem" }}
-            >
-              OPEN_TEAM_DASHBOARD()
-            </button>
-            <button onClick={handleLogout} className="btn" style={{ width: "100%" }}>
-              LOGOUT()
-            </button>
+          <div className="space-y-6">
+            <div className="p-8 rounded-2xl bg-cyan-400/5 border border-cyan-400/10 space-y-4">
+              <div>
+                <span className="text-[9px] font-black text-zinc-600 block mb-1">NODE_IDENTITY</span>
+                <p className="font-bold text-white truncate uppercase">{authUser.email}</p>
+              </div>
+              <div>
+                <span className="text-[9px] font-black text-zinc-600 block mb-1">ACCESS_LEVEL</span>
+                <p className="font-bold text-[#00FFFF] uppercase tracking-widest">{role || ROLES.PARTICIPANT}</p>
+              </div>
+            </div>
+            
+            <div className="space-y-3">
+              <button
+                onClick={() => router.push("/team")}
+                className="w-full bg-white text-black font-black uppercase text-xs tracking-widest py-5 rounded-2xl hover:scale-[1.02] transition-all"
+              >
+                OPEN_SECURE_DASHBOARD()
+              </button>
+              <button 
+                onClick={handleLogout} 
+                className="w-full bg-white/5 border border-white/10 text-white font-black uppercase text-xs tracking-widest py-5 rounded-2xl hover:bg-white/10 transition-all"
+              >
+                TERMINATE_SESSION()
+              </button>
+            </div>
           </div>
         )}
       </div>

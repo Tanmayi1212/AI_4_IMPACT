@@ -2,35 +2,18 @@ import AboutSection from "../components/landing/AboutSection";
 import EventsSection from "../components/landing/EventsSection";
 import HeroSection from "../components/landing/HeroSection";
 import HighlightsSection from "../components/landing/HighlightsSection";
-import LandingNavbar from "../components/landing/LandingNavbar";
 import SponsorsSection from "../components/landing/SponsorsSection";
 import TimelineSection from "../components/landing/TimelineSection";
-import { InteractiveBackground } from "../components/ui/interactive-background";
+import { ParallaxBackground } from "../components/ui/parallax-background";
 import { KineticHUD } from "../components/ui/kinetic-hud";
-import { NeuralBackground } from "../components/ui/neural-background";
 
 export default function HomePage() {
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#020205] text-white">
-      <InteractiveBackground />
-      <div className="noise-overlay" />
-      <NeuralBackground />
+    <main className="relative min-h-screen overflow-hidden bg-[#050505] text-white">
+      <ParallaxBackground />
       <KineticHUD />
-      
-      {/* Dynamic Background Glows */}
-      <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
-        <div className="absolute -left-[10%] -top-[10%] h-[50vw] w-[50vw] rounded-full bg-fuchsia-900/10 blur-[120px]" />
-        <div className="absolute -right-[10%] top-[20%] h-[40vw] w-[40vw] rounded-full bg-cyan-900/10 blur-[120px]" />
-        <div className="absolute left-[20%] bottom-[-10%] h-[40vw] w-[40vw] rounded-full bg-violet-900/10 blur-[120px]" />
-        <div 
-          className="absolute inset-0 opacity-[0.03]" 
-          style={{ backgroundImage: 'radial-gradient(#fff 1px, transparent 1px)', backgroundSize: '40px 40px' }}
-        />
-      </div>
 
-      <LandingNavbar />
-
-      <div className="relative z-10 mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+      <div className="relative z-10 mx-auto w-full max-w-7xl px-0 sm:px-6 lg:px-8">
         <HeroSection />
         <div className="flex flex-col gap-24 py-24 sm:gap-32 sm:py-32">
           <AboutSection />
