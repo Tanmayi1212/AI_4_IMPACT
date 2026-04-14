@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getUserRole, logoutAdmin, onUserAuthChange } from "../../../lib/auth";
+import { toRuntimeApiUrl } from "../../../lib/api-base";
+import { buildRuntimeIdTokenHeaders } from "../../../lib/runtime-auth";
 import { ROLES } from "../../../lib/constants/roles";
 
 function StatusBadge({ status }) {
@@ -70,10 +72,8 @@ export default function TeamLeadDashboard() {
 
     try {
       const idToken = await currentUser.getIdToken();
-      const response = await fetch("/api/team/dashboard", {
-        headers: {
-          Authorization: `Bearer ${idToken}`,
-        },
+      const response = await fetch(toRuntimeApiUrl("/api/team/dashboard"), {
+        headers: buildRuntimeIdTokenHeaders(idToken),
         cache: "no-store",
       });
 

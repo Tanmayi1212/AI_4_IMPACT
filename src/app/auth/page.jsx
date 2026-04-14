@@ -8,6 +8,8 @@ import {
   logoutAdmin,
   onUserAuthChange,
 } from "../../../lib/auth";
+import { toRuntimeApiUrl } from "../../../lib/api-base";
+import { buildRuntimeIdTokenHeaders } from "../../../lib/runtime-auth";
 import { ROLES } from "../../../lib/constants/roles";
 
 function AuthPageFallback() {
@@ -47,10 +49,8 @@ function AuthPageContent() {
   const hasTeamDashboardAccess = useCallback(async (user) => {
     try {
       const idToken = await user.getIdToken();
-      const response = await fetch("/api/team/dashboard", {
-        headers: {
-          Authorization: `Bearer ${idToken}`,
-        },
+      const response = await fetch(toRuntimeApiUrl("/api/team/dashboard"), {
+        headers: buildRuntimeIdTokenHeaders(idToken),
         cache: "no-store",
       });
 
@@ -73,7 +73,7 @@ function AuthPageContent() {
       return normalized;
     }
 
-    const response = await fetch("/api/team/access/resolve", {
+    const response = await fetch(toRuntimeApiUrl("/api/team/access/resolve"), {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

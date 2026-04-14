@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { adminAuth, adminDb } from "../../../../../firebaseAdmin";
+import { readRuntimeIdTokenFromRequest } from "../../../../../lib/runtime-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -38,13 +39,7 @@ function normalizeRole(role) {
 }
 
 async function verifyRequestUser(request) {
-  const authHeader = request.headers.get("authorization") || "";
-
-  if (!authHeader.startsWith("Bearer ")) {
-    return { error: unauthorized("Missing or invalid Authorization header.") };
-  }
-
-  const idToken = authHeader.slice(7).trim();
+  const idToken = readRuntimeIdTokenFromRequest(request);
   if (!idToken) {
     return { error: unauthorized("Missing Firebase ID token.") };
   }

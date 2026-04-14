@@ -3,16 +3,6 @@
     "site": "ai4impact",
     "public": "out",
     "cleanUrls": true,
-    "rewrites": [
-      {
-        "source": "/api/**",
-        "run": {
-          "serviceId": "ai4impact-backend",
-          "region": "us-central1",
-          "pinTag": true
-        }
-      }
-    ],
     "ignore": [
       "firebase.json",
       "**/.*",

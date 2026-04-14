@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { adminAuth, adminDb, FieldValue } from "../../../../../firebaseAdmin";
+import { updateLatestCredentialEventMailDelivery } from "./credential-sheet-export";
 
 const ENV = globalThis?.process?.env || {};
 
@@ -12,6 +13,29 @@ const RETRYABLE_STATES = new Set(["ERROR", "RETRY"]);
 const MIN_STALE_MINUTES = 1;
 const MAX_STALE_MINUTES = 240;
 const DEFAULT_STALE_MINUTES = 20;
+const BOOTSTRAP_PASSWORD_SUFFIX = "Aa1!";
+const DEFAULT_AUTH_RETRY_ATTEMPTS = 3;
+const DEFAULT_AUTH_RETRY_BASE_MS = 250;
+
+const RETRYABLE_AUTH_CODES = new Set([
+  "auth/internal-error",
+  "auth/network-request-failed",
+  "auth/too-many-requests",
+  "auth/quota-exceeded",
+]);
+
+const EVENT_MAIL_ERROR_CODES = new Set([
+  "AUTH_RATE_LIMIT",
+  "AUTH_BACKEND_ERROR",
+  "AUTH_CREDENTIALS_ERROR",
+  "AUTH_PROJECT_CONFIG_ERROR",
+  "TEAM_LOGIN_NOT_PROVISIONED",
+  "INVALID_LEADER_EMAIL",
+  "LEADER_EMAIL_CONFLICT",
+  "LEADER_EMAIL_IS_ADMIN",
+  "PASSWORD_PROVIDER_DISABLED",
+  "INTERNAL_ERROR",
+]);
 
 class CredentialEmailError extends Error {
   constructor(status, code, message, details = {}) {
@@ -54,6 +78,89 @@ function parseStaleMinutes() {
   }
 
   return configured;
+}
+
+function parseAuthRetryAttempts() {
+  const configured = parseNonNegativeInteger(
+    ENV.CREDENTIAL_EMAIL_AUTH_RETRY_ATTEMPTS,
+    DEFAULT_AUTH_RETRY_ATTEMPTS
+  );
+
+  return Math.max(1, configured);
+}
+
+function parseAuthRetryBaseMs() {
+  const configured = parseNonNegativeInteger(
+    ENV.CREDENTIAL_EMAIL_AUTH_RETRY_BASE_MS,
+    DEFAULT_AUTH_RETRY_BASE_MS
+  );
+
+  return Math.max(100, configured);
+}
+
+function shouldMarkMailDeliveryError(code) {
+  return EVENT_MAIL_ERROR_CODES.has(asTrimmedString(code).toUpperCase());
+}
+
+function isRetryableAuthCode(code) {
+  return RETRYABLE_AUTH_CODES.has(asTrimmedString(code).toLowerCase());
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
+async function runWithAuthRetry(action) {
+  const maxAttempts = parseAuthRetryAttempts();
+  const baseMs = parseAuthRetryBaseMs();
+  let lastError = null;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      return await action();
+    } catch (error) {
+      lastError = error;
+      const code = toAuthErrorCode(error);
+      const canRetry = isRetryableAuthCode(code) && attempt < maxAttempts;
+
+      if (!canRetry) {
+        throw error;
+      }
+
+      const delayMs = Math.min(2000, baseMs * Math.pow(2, attempt - 1));
+      await sleep(delayMs);
+    }
+  }
+
+  throw lastError;
+}
+
+async function syncLatestEventMailDeliveryBestEffort({
+  transactionId,
+  status,
+  lastError = "",
+}) {
+  const normalizedTransactionId = asTrimmedString(transactionId);
+  if (!normalizedTransactionId) {
+    return;
+  }
+
+  try {
+    await updateLatestCredentialEventMailDelivery({
+      transactionId: normalizedTransactionId,
+      status,
+      lastError,
+      syncSheet: true,
+    });
+  } catch (error) {
+    console.error("Failed to sync credential event mail delivery:", {
+      transaction_id: normalizedTransactionId,
+      status,
+      message: error?.message || "unknown",
+    });
+  }
 }
 
 function normalizeDeliveryState(value) {
@@ -109,6 +216,92 @@ function toDateSafe(value) {
 function toIso(value) {
   const date = toDateSafe(value);
   return date ? date.toISOString() : null;
+}
+
+function toAuthErrorCode(error) {
+  return asTrimmedString(error?.code).toLowerCase();
+}
+
+function mapAuthErrorToCredentialEmailError(error) {
+  const code = toAuthErrorCode(error);
+
+  if (!code.startsWith("auth/")) {
+    return null;
+  }
+
+  if (code === "auth/user-not-found") {
+    return new CredentialEmailError(
+      409,
+      "TEAM_LOGIN_NOT_PROVISIONED",
+      "Team login account was not found. Regenerate credentials and retry email dispatch."
+    );
+  }
+
+  if (code === "auth/invalid-email") {
+    return new CredentialEmailError(
+      400,
+      "INVALID_LEADER_EMAIL",
+      "Leader email in access credentials is invalid."
+    );
+  }
+
+  if (code === "auth/email-already-exists") {
+    return new CredentialEmailError(
+      409,
+      "LEADER_EMAIL_CONFLICT",
+      "Leader email is already associated with another auth account."
+    );
+  }
+
+  if (code === "auth/operation-not-allowed") {
+    return new CredentialEmailError(
+      503,
+      "PASSWORD_PROVIDER_DISABLED",
+      "Email/password authentication is disabled in Firebase Auth."
+    );
+  }
+
+  if (code === "auth/too-many-requests") {
+    return new CredentialEmailError(
+      429,
+      "AUTH_RATE_LIMIT",
+      "Firebase Auth rate limit reached while generating reset link. Retry shortly."
+    );
+  }
+
+  if (code === "auth/quota-exceeded") {
+    return new CredentialEmailError(
+      429,
+      "AUTH_RATE_LIMIT",
+      "Firebase Auth quota exceeded. Retry shortly."
+    );
+  }
+
+  if (code === "auth/invalid-credential" || code === "auth/insufficient-permission") {
+    return new CredentialEmailError(
+      503,
+      "AUTH_CREDENTIALS_ERROR",
+      "Firebase Admin credentials are not authorized for Auth operations."
+    );
+  }
+
+  if (code === "auth/project-not-found") {
+    return new CredentialEmailError(
+      503,
+      "AUTH_PROJECT_CONFIG_ERROR",
+      "Firebase Auth project configuration is invalid."
+    );
+  }
+
+  return new CredentialEmailError(
+    503,
+    "AUTH_BACKEND_ERROR",
+    "Firebase Auth is temporarily unavailable. Retry shortly."
+  );
+}
+
+function buildBootstrapPassword() {
+  return `${randomUUID()}${BOOTSTRAP_PASSWORD_SUFFIX}`;
 }
 
 function escapeHtml(value) {
@@ -260,8 +453,16 @@ function parseCredentialIdentity(registrationData) {
   const teamId = asTrimmedString(
     registrationData.team_access_id || rawAccess.team_id
   ).toLowerCase();
+  const authUid = asTrimmedString(
+    registrationData.team_lead_auth_uid || rawAccess.auth_uid
+  );
   const leaderEmail = asNormalizedEmail(rawAccess.leader_email);
   const leaderName = asTrimmedString(rawAccess.leader_name);
+  const leaderParticipantId = asTrimmedString(
+    Array.isArray(registrationData.member_ids)
+      ? registrationData.member_ids[0]
+      : ""
+  );
 
   if (!teamId) {
     throw new CredentialEmailError(
@@ -281,10 +482,189 @@ function parseCredentialIdentity(registrationData) {
 
   return {
     teamId,
+    authUid,
     leaderEmail,
     leaderName,
+    leaderParticipantId,
     rawAccess,
   };
+}
+
+async function getAuthUserByUid(uid) {
+  const normalizedUid = asTrimmedString(uid);
+  if (!normalizedUid) return null;
+
+  try {
+    return await runWithAuthRetry(() => adminAuth.getUser(normalizedUid));
+  } catch (error) {
+    if (toAuthErrorCode(error) === "auth/user-not-found") {
+      return null;
+    }
+
+    const mapped = mapAuthErrorToCredentialEmailError(error);
+    if (mapped) {
+      throw mapped;
+    }
+
+    throw error;
+  }
+}
+
+async function getAuthUserByEmail(email) {
+  const normalizedEmail = asNormalizedEmail(email);
+  if (!normalizedEmail) return null;
+
+  try {
+    return await runWithAuthRetry(() => adminAuth.getUserByEmail(normalizedEmail));
+  } catch (error) {
+    if (toAuthErrorCode(error) === "auth/user-not-found") {
+      return null;
+    }
+
+    const mapped = mapAuthErrorToCredentialEmailError(error);
+    if (mapped) {
+      throw mapped;
+    }
+
+    throw error;
+  }
+}
+
+function assertNonAdminAuthUser(userRecord) {
+  if (userRecord?.customClaims?.admin === true) {
+    throw new CredentialEmailError(
+      409,
+      "LEADER_EMAIL_IS_ADMIN",
+      "Leader email belongs to an admin account. Use a non-admin team leader email."
+    );
+  }
+}
+
+async function ensureCredentialEmailAuthUser({
+  registrationIdentity,
+  registrationRefId,
+}) {
+  let userRecord = null;
+
+  if (registrationIdentity.authUid) {
+    const uidUser = await getAuthUserByUid(registrationIdentity.authUid);
+    if (
+      uidUser &&
+      asNormalizedEmail(uidUser.email) === registrationIdentity.leaderEmail
+    ) {
+      userRecord = uidUser;
+    }
+  }
+
+  if (!userRecord) {
+    userRecord = await getAuthUserByEmail(registrationIdentity.leaderEmail);
+  }
+
+  let created = false;
+  if (!userRecord) {
+    try {
+      userRecord = await runWithAuthRetry(() =>
+        adminAuth.createUser({
+          email: registrationIdentity.leaderEmail,
+          password: buildBootstrapPassword(),
+          displayName: registrationIdentity.leaderName || registrationIdentity.teamId,
+          disabled: false,
+        })
+      );
+      created = true;
+    } catch (error) {
+      const mapped = mapAuthErrorToCredentialEmailError(error);
+      if (mapped) {
+        throw mapped;
+      }
+
+      throw error;
+    }
+  }
+
+  assertNonAdminAuthUser(userRecord);
+
+  if (created) {
+    try {
+      const existingClaims = userRecord.customClaims || {};
+      const claims = {
+        ...existingClaims,
+        role: "TEAM_LEAD",
+        team_access_id: registrationIdentity.teamId,
+        registration_ref: registrationRefId,
+        must_reset_password: true,
+      };
+
+      if (registrationIdentity.leaderParticipantId) {
+        claims.participant_id = registrationIdentity.leaderParticipantId;
+      }
+
+      await runWithAuthRetry(() => adminAuth.setCustomUserClaims(userRecord.uid, claims));
+    } catch (error) {
+      const mapped = mapAuthErrorToCredentialEmailError(error);
+      if (mapped) {
+        throw mapped;
+      }
+
+      throw error;
+    }
+  }
+
+  return {
+    ...registrationIdentity,
+    authUid: userRecord.uid,
+  };
+}
+
+async function createSetupLinkWithRecovery({
+  registrationIdentity,
+  registrationRefId,
+  loginUrl,
+}) {
+  let effectiveIdentity = registrationIdentity;
+
+  try {
+    const setupLink = await runWithAuthRetry(() =>
+      generateSetupLink(effectiveIdentity.leaderEmail, loginUrl)
+    );
+
+    return {
+      setupLink,
+      registrationIdentity: effectiveIdentity,
+    };
+  } catch (error) {
+    if (toAuthErrorCode(error) !== "auth/user-not-found") {
+      const mapped = mapAuthErrorToCredentialEmailError(error);
+      if (mapped) {
+        throw mapped;
+      }
+
+      throw error;
+    }
+  }
+
+  effectiveIdentity = await ensureCredentialEmailAuthUser({
+    registrationIdentity: effectiveIdentity,
+    registrationRefId,
+  });
+
+  try {
+    const setupLink = await runWithAuthRetry(() =>
+      generateSetupLink(effectiveIdentity.leaderEmail, loginUrl)
+    );
+
+    return {
+      setupLink,
+      registrationIdentity: effectiveIdentity,
+    };
+  } catch (error) {
+    const mapped = mapAuthErrorToCredentialEmailError(error);
+    if (mapped) {
+      throw mapped;
+    }
+
+    throw error;
+  }
 }
 
 async function readCurrentDeliveryState({ rawDelivery, transaction }) {
@@ -467,10 +847,16 @@ export async function queueCredentialEmail({
       .collection("hackathon_registrations")
       .doc(queueContext.registrationRefId);
     const registrationDoc = await registrationRef.get();
-    const registrationIdentity = parseCredentialIdentity(registrationDoc.data());
+    let registrationIdentity = parseCredentialIdentity(registrationDoc.data());
 
     const loginUrl = buildLoginUrl(requestOrigin);
-    const setupLink = await generateSetupLink(registrationIdentity.leaderEmail, loginUrl);
+    const setupLinkResult = await createSetupLinkWithRecovery({
+      registrationIdentity,
+      registrationRefId: queueContext.registrationRefId,
+      loginUrl,
+    });
+    registrationIdentity = setupLinkResult.registrationIdentity;
+    const setupLink = setupLinkResult.setupLink;
     const emailContent = buildEmailContent({
       leaderName: registrationIdentity.leaderName,
       teamId: registrationIdentity.teamId,
@@ -533,6 +919,7 @@ export async function queueCredentialEmail({
           transaction_id: normalizedTransactionId,
           registration_ref: txContext.registrationRefId,
           team_id: identity.teamId,
+          auth_uid: registrationIdentity.authUid || null,
           recipient_email: identity.leaderEmail,
           requested_by: normalizedAdminUid,
           request_id: requestId,
@@ -567,6 +954,11 @@ export async function queueCredentialEmail({
         "access_credentials.updated_at": FieldValue.serverTimestamp(),
       };
 
+      if (registrationIdentity.authUid) {
+        updates.team_lead_auth_uid = registrationIdentity.authUid;
+        updates["access_credentials.auth_uid"] = registrationIdentity.authUid;
+      }
+
       if (currentDelivery.queueDocId) {
         updates["access_credentials.email_delivery.previous_queue_doc_id"] =
           currentDelivery.queueDocId;
@@ -586,6 +978,12 @@ export async function queueCredentialEmail({
       transaction.update(txRegistrationRef, updates);
     });
 
+    await syncLatestEventMailDeliveryBestEffort({
+      transactionId: normalizedTransactionId,
+      status: "PENDING",
+      lastError: "",
+    });
+
     return {
       success: true,
       status: 200,
@@ -603,12 +1001,39 @@ export async function queueCredentialEmail({
     };
   } catch (error) {
     if (error instanceof CredentialEmailError) {
+      if (shouldMarkMailDeliveryError(error.code)) {
+        await syncLatestEventMailDeliveryBestEffort({
+          transactionId,
+          status: "ERROR",
+          lastError: error.message,
+        });
+      }
+
       return {
         success: false,
         status: error.status,
         code: error.code,
         error: error.message,
         ...(error.details || {}),
+      };
+    }
+
+    const mapped = mapAuthErrorToCredentialEmailError(error);
+    if (mapped) {
+      if (shouldMarkMailDeliveryError(mapped.code)) {
+        await syncLatestEventMailDeliveryBestEffort({
+          transactionId,
+          status: "ERROR",
+          lastError: mapped.message,
+        });
+      }
+
+      return {
+        success: false,
+        status: mapped.status,
+        code: mapped.code,
+        error: mapped.message,
+        ...(mapped.details || {}),
       };
     }
 
@@ -619,6 +1044,12 @@ export async function queueCredentialEmail({
       force: force === true,
       message: error?.message || "unknown",
       stack: error?.stack || null,
+    });
+
+    await syncLatestEventMailDeliveryBestEffort({
+      transactionId,
+      status: "ERROR",
+      lastError: "Failed to queue credential email.",
     });
 
     return {

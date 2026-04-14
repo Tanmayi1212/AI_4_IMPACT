@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, onSnapshot } from "firebase/firestore";
+import { toRuntimeApiUrl } from "../../../lib/api-base";
+import { buildRuntimeIdTokenHeaders } from "../../../lib/runtime-auth";
 import { auth, db } from "../../../lib/firebase";
 
 function toMillis(value) {
@@ -67,11 +69,10 @@ export default function ParticipantDashboard() {
 
   async function runAuthedFetch(url, options = {}) {
     const token = await authUser.getIdToken();
-    return fetch(url, {
+    return fetch(toRuntimeApiUrl(url), {
       ...options,
       headers: {
-        ...(options.headers || {}),
-        Authorization: `Bearer ${token}`,
+        ...buildRuntimeIdTokenHeaders(token, options.headers || {}),
       },
     });
   }

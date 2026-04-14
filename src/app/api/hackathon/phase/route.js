@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { FieldValue } from "../../../../../lib/admin";
 import { PHASE_LIST } from "../../../../../lib/constants/phases";
-import { ROLES } from "../../../../../lib/constants/roles";
 import { verifyRequestWithProfile, isAdmin } from "../../../../../lib/server/auth";
 import { getHackathonConfig, getHackathonConfigRef } from "../../../../../lib/server/hackathon";
 
@@ -22,7 +21,7 @@ export async function GET() {
 export async function PATCH(request) {
   try {
     const { authUser, profile } = await verifyRequestWithProfile(request);
-    if (!authUser || (!isAdmin(profile, authUser) && profile?.role !== ROLES.ADMIN)) {
+    if (!authUser || !isAdmin(profile, authUser)) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
 

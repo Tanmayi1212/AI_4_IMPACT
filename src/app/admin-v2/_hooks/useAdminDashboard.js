@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { getUserRole, logoutAdmin, onUserAuthChange } from "../../../../lib/auth";
+import { toRuntimeApiUrl } from "../../../../lib/api-base";
+import { buildRuntimeIdTokenHeaders } from "../../../../lib/runtime-auth";
 import { ROLES } from "../../../../lib/constants/roles";
 import { db } from "../../../../lib/firebase";
 import {
@@ -182,10 +184,8 @@ export function useAdminDashboard() {
 
     try {
       const idToken = await user.getIdToken();
-      const response = await fetch("/api/admin/registrations", {
-        headers: {
-          Authorization: `Bearer ${idToken}`,
-        },
+      const response = await fetch(toRuntimeApiUrl("/api/admin/registrations"), {
+        headers: buildRuntimeIdTokenHeaders(idToken),
         cache: "no-store",
       });
 
@@ -564,12 +564,11 @@ export function useAdminDashboard() {
 
       if (apiRuntimeAvailable) {
         const idToken = await user.getIdToken();
-        const response = await fetch("/api/admin/verify-payment", {
+        const response = await fetch(toRuntimeApiUrl("/api/admin/verify-payment"), {
           method: "POST",
-          headers: {
-            Authorization: `Bearer ${idToken}`,
+          headers: buildRuntimeIdTokenHeaders(idToken, {
             "Content-Type": "application/json",
-          },
+          }),
           body: JSON.stringify({
             transaction_id: selectedTeam.transactionDocId || selectedTeam.id,
             action,
@@ -715,12 +714,11 @@ export function useAdminDashboard() {
 
     try {
       const idToken = await user.getIdToken();
-      const response = await fetch("/api/admin/regenerate-team-credentials", {
+      const response = await fetch(toRuntimeApiUrl("/api/admin/regenerate-team-credentials"), {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${idToken}`,
+        headers: buildRuntimeIdTokenHeaders(idToken, {
           "Content-Type": "application/json",
-        },
+        }),
         body: JSON.stringify({
           transaction_id: selectedTeam.transactionDocId || selectedTeam.id,
         }),
@@ -817,12 +815,11 @@ export function useAdminDashboard() {
 
       try {
         const idToken = await user.getIdToken();
-        const response = await fetch("/api/admin/send-team-credentials-email", {
+        const response = await fetch(toRuntimeApiUrl("/api/admin/send-team-credentials-email"), {
           method: "POST",
-          headers: {
-            Authorization: `Bearer ${idToken}`,
+          headers: buildRuntimeIdTokenHeaders(idToken, {
             "Content-Type": "application/json",
-          },
+          }),
           body: JSON.stringify({
             transaction_id: targetTeam.transactionDocId || targetTeam.id,
             force,
@@ -916,12 +913,11 @@ export function useAdminDashboard() {
 
     try {
       const idToken = await user.getIdToken();
-      const response = await fetch("/api/admin/send-team-credentials-email/bulk", {
+      const response = await fetch(toRuntimeApiUrl("/api/admin/send-team-credentials-email/bulk"), {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${idToken}`,
+        headers: buildRuntimeIdTokenHeaders(idToken, {
           "Content-Type": "application/json",
-        },
+        }),
         body: JSON.stringify({
           transaction_ids: bulkSendCandidateIds,
           force: false,
@@ -1065,12 +1061,11 @@ export function useAdminDashboard() {
 
     try {
       const idToken = await user.getIdToken();
-      const response = await fetch("/api/admin/delete-registration", {
+      const response = await fetch(toRuntimeApiUrl("/api/admin/delete-registration"), {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${idToken}`,
+        headers: buildRuntimeIdTokenHeaders(idToken, {
           "Content-Type": "application/json",
-        },
+        }),
         body: JSON.stringify({
           transaction_id: transactionId,
         }),

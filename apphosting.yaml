@@ -6,3 +6,19 @@ runConfig:
   concurrency: 80
   cpu: 1
   memoryMiB: 512
+
+env:
+  - variable: CREDENTIAL_SHEET_SYNC_ENABLED
+    value: "true"
+    availability:
+      - RUNTIME
+
+  - variable: GOOGLE_SHEETS_SPREADSHEET_ID
+    value: "1K-xN8FtkpG1Y5diqRPY-DksJZkkGGpkxU9mSGA5lxnU"
+    availability:
+      - RUNTIME
+
+  - variable: GOOGLE_SHEETS_WORKSHEET
+    value: "Sheet1"
+    availability:
+      - RUNTIME

@@ -1,4 +1,13 @@
+param(
+	[switch]$AllowStaticDeploy
+)
+
 # Build and deploy a static export (no Cloud Functions / server runtime)
+# Guarded by explicit opt-in to avoid taking down admin server APIs during live registrations.
+if (-not $AllowStaticDeploy) {
+	throw "Static export deploy is blocked by default for production safety. Re-run with -AllowStaticDeploy only for deliberate static-only maintenance windows."
+}
+
 $apiPath = "src/app/api"
 $apiBackupPath = "src/app/__api_runtime_backup"
 $middlewarePath = "middleware.js"

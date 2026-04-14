@@ -3,10 +3,15 @@ param(
   [string]$BackendId = "ai4impact-backend",
   [string]$GitBranch = "main",
   [switch]$SourceDeploy,
-  [switch]$Force
+  [switch]$Force,
+  [switch]$AcknowledgeAppHosting
 )
 
 $ErrorActionPreference = "Stop"
+
+if (-not $AcknowledgeAppHosting) {
+  throw "App Hosting deploy is paused by default. Re-run with -AcknowledgeAppHosting only when you intentionally want to use Firebase App Hosting."
+}
 
 function Invoke-FirebaseTools {
   param(
@@ -24,21 +29,7 @@ Write-Host "Checking App Hosting backend '$BackendId' in project '$ProjectId'...
 Invoke-FirebaseTools -Arguments @("apphosting:backends:get", $BackendId, "--project", $ProjectId)
 
 if ($SourceDeploy) {
-  $sourceDeployCommand = @(
-    "deploy",
-    "--only",
-    "apphosting:$BackendId",
-    "--project",
-    $ProjectId,
-    "--non-interactive"
-  )
-
-  if ($Force) {
-    $sourceDeployCommand += "--force"
-  }
-
-  Write-Host "Deploying local source to App Hosting backend '$BackendId'..." -ForegroundColor Green
-  Invoke-FirebaseTools -Arguments $sourceDeployCommand
+  throw "SourceDeploy is not supported in this repo because firebase.json has no App Hosting deploy target mapping. Use branch rollout mode or configure App Hosting source deploy in Firebase first."
 } else {
   $rolloutCommand = @(
     "apphosting:rollouts:create",
