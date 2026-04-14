@@ -87,8 +87,6 @@ export default function SponsorsSection() {
           </div>
         </div>
       </motion.article>
-
-      </motion.article>
     </section>
   );
 }

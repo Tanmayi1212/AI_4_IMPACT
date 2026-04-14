@@ -67,8 +67,6 @@ export default function HighlightsSection() {
           EXCLUDING INCUBATION OPPORTUNITIES
         </p>
       </motion.article>
-
-      </motion.article>
     </section>
   );
 }

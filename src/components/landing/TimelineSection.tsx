@@ -115,7 +115,7 @@ export default function TimelineSection() {
             ? "border-cyan-500/50 bg-cyan-500/[0.03] shadow-[0_0_30px_rgba(34,211,238,0.1)] -translate-y-1" 
             : "border-[#8D36D5]/40 bg-white/[0.02] shadow-[0_0_24px_rgba(141,54,213,0.1)]"
         }`}>
-          <div className="relative z-10 flex h-full flex-col rounded-2xl bg-black/40 p-6 backdrop-blur-md lg:p-8">
+          <div className="relative z-10 flex h-full flex-col rounded-2xl p-6 lg:p-8">
             <div className={`scanning-ray ${isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100 transition-opacity"}`} />
             
             <div className="flex items-center gap-3 mb-4">
@@ -143,13 +143,13 @@ export default function TimelineSection() {
   });
 
   return (
-    <section id="timeline" className="bg-black py-16 lg:py-20 scroll-mt-32">
+    <section id="timeline" className="py-16 lg:py-24 scroll-mt-32">
       <motion.div
         initial={{ opacity: 0, x: -20 }}
         whileInView={{ opacity: 1, x: 0 }}
         viewport={{ once: true }}
         transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-        className="mb-8 lg:mb-10"
+        className="mb-8 lg:mb-10 px-6 sm:px-8 lg:px-12"
       >
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-5xl font-black uppercase tracking-tighter text-white sm:text-7xl lg:text-8xl">
@@ -164,7 +164,7 @@ export default function TimelineSection() {
         </div>
       </motion.div>
 
-      <div className="py-12 sm:py-16 lg:py-24">
+      <div className="py-12 sm:py-16 lg:py-24 px-6 sm:px-8 lg:px-12">
         <div className="mb-14 flex items-center gap-4">
           <div className="h-[1px] w-12 bg-[#8D36D5]" />
           <span className="text-[10px] font-black tracking-[0.5em] text-[#8D36D5] uppercase">
