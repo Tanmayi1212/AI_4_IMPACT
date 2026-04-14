@@ -12,7 +12,11 @@ const CREDENTIAL_EXPORT_COUNTER_DOC =
   "credential_sheet_sync";
 
 const DEFAULT_WORKSHEET =
-  String(ENV.CREDENTIAL_SHEET_WORKSHEET || "CredentialEvents").trim() ||
+  String(
+    ENV.CREDENTIAL_SHEET_WORKSHEET ||
+      ENV.GOOGLE_SHEETS_WORKSHEET ||
+      "CredentialEvents"
+  ).trim() ||
   "CredentialEvents";
 
 const SHEET_HEADER_ROWS = Number.parseInt(
@@ -135,9 +139,24 @@ function readServiceAccountFromEnv() {
     }
   }
 
-  const clientEmail = asTrimmedString(ENV.GOOGLE_SHEETS_CLIENT_EMAIL || "");
-  const privateKey = normalizePrivateKey(ENV.GOOGLE_SHEETS_PRIVATE_KEY || "");
-  const projectId = asTrimmedString(ENV.GOOGLE_SHEETS_PROJECT_ID || "");
+  const clientEmail = asTrimmedString(
+    ENV.GOOGLE_SHEETS_CLIENT_EMAIL ||
+      ENV.FIREBASE_ADMIN_CLIENT_EMAIL ||
+      ENV.FIREBASE_CLIENT_EMAIL ||
+      ""
+  );
+  const privateKey = normalizePrivateKey(
+    ENV.GOOGLE_SHEETS_PRIVATE_KEY ||
+      ENV.FIREBASE_ADMIN_PRIVATE_KEY ||
+      ENV.FIREBASE_PRIVATE_KEY ||
+      ""
+  );
+  const projectId = asTrimmedString(
+    ENV.GOOGLE_SHEETS_PROJECT_ID ||
+      ENV.FIREBASE_ADMIN_PROJECT_ID ||
+      ENV.FIREBASE_PROJECT_ID ||
+      ""
+  );
 
   if (!clientEmail || !privateKey) {
     return null;
