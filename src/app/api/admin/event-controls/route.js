@@ -13,6 +13,7 @@ import {
   validateEventControls,
 } from "../../../../../lib/server/event-controls";
 import { requireAdmin } from "../_utils/auth";
+import { invalidatePublicEventStateCache } from "../_utils/runtime-cache-invalidation";
 
 export const dynamic = "force-dynamic";
 
@@ -143,6 +144,8 @@ export async function PUT(request) {
     } catch (auditError) {
       console.error("Failed to write event controls audit log:", auditError);
     }
+
+    invalidatePublicEventStateCache();
 
     return NextResponse.json({
       success: true,

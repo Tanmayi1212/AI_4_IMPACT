@@ -8,6 +8,22 @@ runConfig:
   memoryMiB: 512
 
 env:
+  - variable: FEATURE_ADMIN_READ_MODEL_ENABLED
+    value: "true"
+    availability:
+      - RUNTIME
+
+  - variable: NEXT_PUBLIC_FEATURE_ADMIN_CLIENT_FALLBACK_ENABLED
+    value: "false"
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: FEATURE_PAYMENT_SCREENSHOT_COMPRESSION_ENABLED
+    value: "true"
+    availability:
+      - RUNTIME
+
   - variable: CREDENTIAL_SHEET_SYNC_ENABLED
     value: "true"
     availability:

@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { adminAuth, adminDb, FieldValue } from "../../../../../firebaseAdmin";
 import { updateLatestCredentialEventMailDelivery } from "./credential-sheet-export";
+import { invalidateAdminRegistrationsCache } from "./runtime-cache-invalidation";
+import { upsertAdminReadModelForTransaction } from "../../../../../lib/server/admin-read-model.js";
 
 const ENV = globalThis?.process?.env || {};
 
@@ -1038,6 +1040,14 @@ export async function queueCredentialEmail({
       status: "PENDING",
       lastError: "",
     });
+
+    try {
+      await upsertAdminReadModelForTransaction(normalizedTransactionId);
+    } catch (readModelError) {
+      console.error("Failed to upsert admin read model after email queue:", readModelError);
+    }
+
+    invalidateAdminRegistrationsCache();
 
     return {
       success: true,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { getUserRole, logoutAdmin, onUserAuthChange } from "../../../../lib/auth";
 import { toRuntimeApiUrl } from "../../../../lib/api-base";
@@ -33,6 +33,49 @@ const ENV = globalThis?.process?.env || {};
 const DEFAULT_CREDENTIAL_SHEET_URL = String(
   ENV.NEXT_PUBLIC_CREDENTIAL_SHEET_URL || ""
 ).trim();
+const DEFAULT_ADMIN_POLL_MS = 90000;
+const FAST_ADMIN_POLL_MS = 15000;
+const HIDDEN_ADMIN_POLL_MS = 180000;
+const FAST_POLL_WINDOW_MS = 120000;
+const LEGACY_ADMIN_POLL_MS = 15000;
+const ADAPTIVE_POLLING_ENABLED =
+  String(ENV.NEXT_PUBLIC_FEATURE_ADMIN_ADAPTIVE_POLLING_ENABLED || "true")
+    .trim()
+    .toLowerCase() !== "false";
+const CLIENT_FALLBACK_ENABLED =
+  String(ENV.NEXT_PUBLIC_FEATURE_ADMIN_CLIENT_FALLBACK_ENABLED || "false")
+    .trim()
+    .toLowerCase() === "true";
+
+function buildAdminRegistrationsUrl({ fresh = false, track = "all" } = {}) {
+  const baseUrl = toRuntimeApiUrl("/api/admin/registrations");
+
+  const query = new URLSearchParams();
+  if (fresh) {
+    query.set("fresh", "1");
+  }
+
+  const normalizedTrack = String(track || "").trim().toLowerCase();
+  if (normalizedTrack === "workshop" || normalizedTrack === "hackathon") {
+    query.set("type", normalizedTrack);
+  }
+
+  const serializedQuery = query.toString();
+  if (!serializedQuery) {
+    return baseUrl;
+  }
+
+  const joinSymbol = baseUrl.includes("?") ? "&" : "?";
+  return `${baseUrl}${joinSymbol}${serializedQuery}`;
+}
+
+function isDocumentVisible() {
+  if (typeof document === "undefined") {
+    return true;
+  }
+
+  return document.visibilityState === "visible";
+}
 
 function normalizeSearchText(value) {
   return String(value || "")
@@ -147,6 +190,23 @@ export function useAdminDashboard() {
   });
 
   const router = useRouter();
+  const adminPollTimerRef = useRef(null);
+  const fastPollingUntilRef = useRef(0);
+
+  const clearAdminPollTimer = useCallback(() => {
+    if (adminPollTimerRef.current) {
+      clearTimeout(adminPollTimerRef.current);
+      adminPollTimerRef.current = null;
+    }
+  }, []);
+
+  const boostAdminPollingWindow = useCallback(() => {
+    if (!ADAPTIVE_POLLING_ENABLED) {
+      return;
+    }
+
+    fastPollingUntilRef.current = Date.now() + FAST_POLL_WINDOW_MS;
+  }, []);
 
   useEffect(() => {
     let isActive = true;
@@ -189,73 +249,111 @@ export function useAdminDashboard() {
     };
   }, [router]);
 
-  const fetchRegistrations = useCallback(async () => {
-    if (!user) return;
+  const fetchRegistrations = useCallback(
+    async ({ fresh = false } = {}) => {
+      if (!user) return;
 
-    const setClientFallbackMode = () => {
-      setApiRuntimeAvailable(false);
-      setRuntimeNotice(API_RUNTIME_NOTICE);
-    };
+      let apiFailureMessage = "";
 
-    try {
-      const idToken = await user.getIdToken();
-      const response = await fetch(toRuntimeApiUrl("/api/admin/registrations"), {
-        headers: buildRuntimeIdTokenHeaders(idToken),
-        cache: "no-store",
-      });
+      const setClientFallbackMode = () => {
+        setApiRuntimeAvailable(false);
+        setRuntimeNotice(API_RUNTIME_NOTICE);
+      };
 
-      const data = await response.json().catch(() => ({}));
+      try {
+        const idToken = await user.getIdToken();
+        const response = await fetch(buildAdminRegistrationsUrl({ fresh, track: filterTrack }), {
+          headers: buildRuntimeIdTokenHeaders(
+            idToken,
+            fresh ? { "x-admin-cache-bypass": "1" } : {}
+          ),
+          cache: "no-store",
+        });
 
-      if (response.ok) {
-        const mapped = Array.isArray(data?.registrations)
-          ? data.registrations.map((item) => mapRegistrationItem(item))
-          : [];
+        const data = await response.json().catch(() => ({}));
 
-        setRegistrations(mapped);
-        setDataError("");
-        setApiRuntimeAvailable(true);
-        setRuntimeNotice("");
-        return;
-      }
+        if (response.ok) {
+          const mapped = Array.isArray(data?.registrations)
+            ? data.registrations.map((item) => mapRegistrationItem(item))
+            : [];
 
-      if (response.status !== 404 && response.status !== 405) {
-        if (response.status === 403) {
-          throw new Error(
-            "Admin access denied. Ensure this account has admin claim or users/{uid}.role=ADMIN."
-          );
+          setRegistrations(mapped);
+          setDataError("");
+          setApiRuntimeAvailable(true);
+          setRuntimeNotice("");
+          return;
         }
 
-        throw new Error(data?.error || "Failed to sync dashboard data.");
-      }
-    } catch (apiError) {
-      if (apiError?.message && !String(apiError.message).includes("Failed to fetch")) {
-        setDataError(apiError.message);
-      }
-    }
+        if (response.status !== 404 && response.status !== 405) {
+          if (response.status === 403) {
+            throw new Error(
+              "Admin access denied. Ensure this account has admin claim or users/{uid}.role=ADMIN."
+            );
+          }
 
-    try {
-      const fallbackData = await loadAdminRegistrationsFromClient(db);
-      const mappedFallback = fallbackData.map((item) => mapRegistrationItem(item));
+          throw new Error(data?.error || "Failed to sync dashboard data.");
+        }
+      } catch (apiError) {
+        if (apiError?.message) {
+          apiFailureMessage = String(apiError.message);
+        }
 
-      setRegistrations(mappedFallback);
-      setDataError("");
-      setClientFallbackMode();
-    } catch (clientError) {
-      throw new Error(
-        clientError?.message ||
-          "Failed to sync dashboard data in Firestore fallback mode. Check admin auth and rules."
-      );
-    }
-  }, [user]);
+        if (apiFailureMessage && !apiFailureMessage.includes("Failed to fetch")) {
+          setDataError(apiFailureMessage);
+        }
+      }
+
+      if (!CLIENT_FALLBACK_ENABLED) {
+        setApiRuntimeAvailable(false);
+        setRuntimeNotice(API_RUNTIME_NOTICE);
+        throw new Error(apiFailureMessage || "Runtime API unavailable for admin registrations.");
+      }
+
+      try {
+        const fallbackData = await loadAdminRegistrationsFromClient(db);
+        const normalizedTrack = String(filterTrack || "").trim().toLowerCase();
+        const filteredFallback = fallbackData.filter((item) => {
+          if (normalizedTrack === "workshop" || normalizedTrack === "hackathon") {
+            return item?.registration_type === normalizedTrack;
+          }
+
+          return true;
+        });
+        const mappedFallback = filteredFallback.map((item) => mapRegistrationItem(item));
+
+        setRegistrations(mappedFallback);
+        setDataError("");
+        setClientFallbackMode();
+      } catch (clientError) {
+        throw new Error(
+          clientError?.message ||
+            "Failed to sync dashboard data in Firestore fallback mode. Check admin auth and rules."
+        );
+      }
+    },
+    [user, filterTrack]
+  );
 
   useEffect(() => {
     if (!user) return;
 
     let isCancelled = false;
 
-    const syncOnce = async () => {
+    const getNextPollDelay = () => {
+      if (!ADAPTIVE_POLLING_ENABLED) {
+        return LEGACY_ADMIN_POLL_MS;
+      }
+
+      if (Date.now() < fastPollingUntilRef.current) {
+        return FAST_ADMIN_POLL_MS;
+      }
+
+      return isDocumentVisible() ? DEFAULT_ADMIN_POLL_MS : HIDDEN_ADMIN_POLL_MS;
+    };
+
+    const syncOnce = async ({ fresh = false } = {}) => {
       try {
-        await fetchRegistrations();
+        await fetchRegistrations({ fresh });
       } catch (error) {
         if (!isCancelled) {
           setDataError(error?.message || "Failed to sync dashboard data.");
@@ -263,16 +361,50 @@ export function useAdminDashboard() {
       }
     };
 
+    const scheduleNextPoll = () => {
+      if (isCancelled) {
+        return;
+      }
+
+      clearAdminPollTimer();
+      adminPollTimerRef.current = setTimeout(async () => {
+        await syncOnce();
+        scheduleNextPoll();
+      }, getNextPollDelay());
+    };
+
+    const handleVisibilityChange = () => {
+      if (!ADAPTIVE_POLLING_ENABLED || isCancelled) {
+        return;
+      }
+
+      if (isDocumentVisible()) {
+        void syncOnce();
+      }
+
+      scheduleNextPoll();
+    };
+
     void syncOnce();
-    const intervalId = setInterval(() => {
-      void syncOnce();
-    }, 15000);
+    scheduleNextPoll();
+
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", handleVisibilityChange);
+    }
 
     return () => {
       isCancelled = true;
-      clearInterval(intervalId);
+      clearAdminPollTimer();
+      if (typeof document !== "undefined") {
+        document.removeEventListener("visibilitychange", handleVisibilityChange);
+      }
     };
-  }, [user, fetchRegistrations]);
+  }, [user, fetchRegistrations, clearAdminPollTimer]);
+
+  const refreshRegistrationsAfterMutation = useCallback(() => {
+    boostAdminPollingWindow();
+    void fetchRegistrations({ fresh: true });
+  }, [boostAdminPollingWindow, fetchRegistrations]);
 
   useEffect(() => {
     if (!user) return;
@@ -851,12 +983,20 @@ export function useAdminDashboard() {
 
         setNoteText(nextNotes);
       }
+
+      refreshRegistrationsAfterMutation();
     } catch (error) {
       setActionError(error?.message || "Failed to update status.");
     } finally {
       setUpdateBusy(false);
     }
-  }, [selectedTeam, user, updateBusy, apiRuntimeAvailable]);
+  }, [
+    selectedTeam,
+    user,
+    updateBusy,
+    apiRuntimeAvailable,
+    refreshRegistrationsAfterMutation,
+  ]);
 
   const handleRegenerateCredentials = useCallback(async () => {
     if (!selectedTeam || !user || updateBusy) return;
@@ -945,12 +1085,20 @@ export function useAdminDashboard() {
             }
           : prev
       );
+
+      refreshRegistrationsAfterMutation();
     } catch (error) {
       setActionError(error?.message || "Failed to regenerate credentials.");
     } finally {
       setUpdateBusy(false);
     }
-  }, [selectedTeam, user, updateBusy, apiRuntimeAvailable]);
+  }, [
+    selectedTeam,
+    user,
+    updateBusy,
+    apiRuntimeAvailable,
+    refreshRegistrationsAfterMutation,
+  ]);
 
   const handleSendCredentialEmail = useCallback(
     async (targetTeam, { force = false } = {}) => {
@@ -1045,6 +1193,7 @@ export function useAdminDashboard() {
         );
 
         setDataError("");
+        refreshRegistrationsAfterMutation();
       } catch (error) {
         const message = error?.message || "Failed to send credential email.";
 
@@ -1057,7 +1206,13 @@ export function useAdminDashboard() {
         setEmailActionBusyId("");
       }
     },
-    [bulkSendBusy, selectedTeam, user, apiRuntimeAvailable]
+    [
+      bulkSendBusy,
+      selectedTeam,
+      user,
+      apiRuntimeAvailable,
+      refreshRegistrationsAfterMutation,
+    ]
   );
 
   const handleBulkSendUnsent = useCallback(async () => {
@@ -1174,12 +1329,20 @@ export function useAdminDashboard() {
           `Some bulk email operations failed (${failed}). Review email status and retry individually if needed.`
         );
       }
+
+      refreshRegistrationsAfterMutation();
     } catch (error) {
       setDataError(error?.message || "Failed to bulk send unsent credential emails.");
     } finally {
       setBulkSendBusy(false);
     }
-  }, [bulkSendBusy, bulkSendCandidateIds, user, apiRuntimeAvailable]);
+  }, [
+    bulkSendBusy,
+    bulkSendCandidateIds,
+    user,
+    apiRuntimeAvailable,
+    refreshRegistrationsAfterMutation,
+  ]);
 
   const handleDeleteRegistration = useCallback(async (targetTeam) => {
     if (!targetTeam || !user || deleteActionBusyId) {
@@ -1260,6 +1423,8 @@ export function useAdminDashboard() {
       } else {
         setBulkActionMessage(data?.message || "Registration deleted successfully.");
       }
+
+      refreshRegistrationsAfterMutation();
     } catch (error) {
       const message = error?.message || "Failed to delete registration.";
 
@@ -1271,7 +1436,13 @@ export function useAdminDashboard() {
     } finally {
       setDeleteActionBusyId("");
     }
-  }, [apiRuntimeAvailable, deleteActionBusyId, selectedTeam, user]);
+  }, [
+    apiRuntimeAvailable,
+    deleteActionBusyId,
+    selectedTeam,
+    user,
+    refreshRegistrationsAfterMutation,
+  ]);
 
   const handleSaveNotes = useCallback(async () => {
     if (!selectedTeam || updateBusy) return;
