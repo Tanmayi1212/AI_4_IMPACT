@@ -245,6 +245,64 @@ h6,
   backface-visibility: hidden;
 }
 
+/* Elite UI Enhancements */
+.glass-sheen {
+  position: relative;
+  overflow: hidden;
+}
+
+.glass-sheen::after {
+  content: "";
+  position: absolute;
+  top: -150%;
+  left: -150%;
+  width: 400%;
+  height: 400%;
+  background: linear-gradient(
+    45deg,
+    transparent 45%,
+    rgba(255, 255, 255, 0.03) 48%,
+    rgba(255, 255, 255, 0.07) 50%,
+    rgba(255, 255, 255, 0.03) 52%,
+    transparent 55%
+  );
+  transform: translate(var(--sheen-x, 0), var(--sheen-y, 0));
+  pointer-events: none;
+  z-index: 2;
+}
+
+@keyframes breathing-mesh {
+  0%, 100% { opacity: 0.15; transform: scale(1); }
+  50% { opacity: 0.25; transform: scale(1.05); }
+}
+
+.animate-breathing {
+  animation: breathing-mesh 10s ease-in-out infinite;
+}
+
+.text-glow-purple {
+  text-shadow: 0 0 10px rgba(141, 54, 213, 0.5), 0 0 20px rgba(141, 54, 213, 0.3);
+}
+
+.text-glow-cyan {
+  text-shadow: 0 0 10px rgba(0, 255, 255, 0.5), 0 0 20px rgba(0, 255, 255, 0.3);
+}
+
+@keyframes float-particle {
+  0% { transform: translateY(0) translateX(0); opacity: 0; }
+  25% { opacity: 1; }
+  75% { opacity: 1; }
+  100% { transform: translateY(-100vh) translateX(50px); opacity: 0; }
+}
+
+.particle {
+  position: absolute;
+  background: white;
+  border-radius: 50%;
+  pointer-events: none;
+  animation: float-particle linear infinite;
+}
+
 /* Navbar */
 .navbar {
   display: flex;
