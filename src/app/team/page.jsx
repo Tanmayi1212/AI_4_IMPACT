@@ -122,19 +122,14 @@ export default function TeamLeadDashboard() {
 
   const [authChecking, setAuthChecking] = useState(true);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [user, setUser] = useState(null);
   const [dashboard, setDashboard] = useState(null);
   const [error, setError] = useState("");
 
-  const fetchDashboard = useCallback(async (currentUser, isRefresh = false) => {
+  const fetchDashboard = useCallback(async (currentUser) => {
     if (!currentUser) return;
 
-    if (isRefresh) {
-      setRefreshing(true);
-    } else {
-      setLoading(true);
-    }
+    setLoading(true);
 
     setError("");
 
@@ -162,7 +157,6 @@ export default function TeamLeadDashboard() {
       setError(err?.message || "Failed to load team dashboard.");
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
   }, [router]);
 
@@ -198,7 +192,7 @@ export default function TeamLeadDashboard() {
 
           setUser(nextUser);
           setAuthChecking(false);
-          await fetchDashboard(nextUser, false);
+          await fetchDashboard(nextUser);
         };
 
         void resolve();
@@ -215,11 +209,6 @@ export default function TeamLeadDashboard() {
       unsub();
     };
   }, [fetchDashboard, router]);
-
-  const handleRefresh = async () => {
-    if (!user || refreshing) return;
-    await fetchDashboard(user, true);
-  };
 
   const handleLogout = async () => {
     await logoutAdmin();
@@ -318,20 +307,6 @@ export default function TeamLeadDashboard() {
             </div>
           </motion.div>
           <div className="flex items-center gap-4 w-full md:w-auto">
-            <motion.button
-              whileHover={{ scale: 1.02, backgroundColor: "rgba(255,255,255,0.08)" }}
-              whileTap={{ scale: 0.98 }}
-              className="flex-1 md:flex-none relative px-8 py-3.5 rounded-2xl border border-white/10 bg-white/5 transition-all disabled:opacity-50"
-              onClick={handleRefresh}
-              disabled={refreshing}
-            >
-              <span className="text-[11px] font-black uppercase tracking-[0.2em] flex items-center justify-center gap-2.5 text-white">
-                <svg className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-                {refreshing ? "SYNCING..." : "RE-SYNC"}
-              </span>
-            </motion.button>
             <motion.button
               whileHover={{ scale: 1.02, backgroundColor: "rgba(244,63,94,0.15)" }}
               whileTap={{ scale: 0.98 }}

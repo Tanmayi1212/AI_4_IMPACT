@@ -1,7 +1,6 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useEffect, useState } from "react";
 import { Timeline } from "../ui/timeline";
 
 type EventItem = {
@@ -79,31 +78,8 @@ const events: EventItem[] = [
 ];
 
 export default function TimelineSection() {
-  const [activeIndex, setActiveIndex] = useState(-1);
-  const [completedIndices, setCompletedIndices] = useState<number[]>([]);
-
-  useEffect(() => {
-    const updateProgress = () => {
-      const now = new Date();
-      let active = -1;
-      const completed: number[] = [];
-
-      events.forEach((event, idx) => {
-        if (now >= event.start && now <= event.end) {
-          active = idx;
-        } else if (now > event.end) {
-          completed.push(idx);
-        }
-      });
-
-      setActiveIndex(active);
-      setCompletedIndices(completed);
-    };
-
-    updateProgress();
-    const interval = setInterval(updateProgress, 60000); // Update every minute
-    return () => clearInterval(interval);
-  }, []);
+  const activeIndex = 2; // Workshop Day 2
+  const completedIndices = [0, 1];
 
   const data = events.map((item, idx) => {
     const isActive = idx === activeIndex;

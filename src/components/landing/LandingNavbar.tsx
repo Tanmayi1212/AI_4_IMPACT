@@ -16,7 +16,6 @@ const navItems = [
 ];
 
 const actionItems = [
-  { label: "Register Now", href: "/register" },
   { label: "Login", href: "/auth" },
 ];
 
@@ -330,15 +329,6 @@ export default function LandingNavbar() {
 
               <motion.div variants={itemVariants} className="mt-16 w-full">
                 <div className="grid gap-3">
-                  <Link
-                    href="/register"
-                    onClick={closeMenu}
-                    className="touch-target group relative flex w-full items-center justify-center overflow-hidden rounded-[4px] bg-white py-6 text-base font-black uppercase tracking-[0.4em] text-black shadow-2xl transition-colors hover:bg-zinc-100"
-                  >
-                    <div className="absolute inset-0 bg-gradient-to-r from-[#8D36D5] to-[#46067A] opacity-0 transition-opacity group-hover:opacity-10" />
-                    REGISTER NOW
-                  </Link>
-
                   <Link
                     href="/auth"
                     onClick={closeMenu}
