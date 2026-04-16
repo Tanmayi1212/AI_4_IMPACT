@@ -13,7 +13,7 @@ export default function HighlightsSection() {
         className="mb-8"
       >
         <h2 className="type-h2 font-black tracking-tighter text-white">
-          THE <span className="bg-gradient-to-r from-[#8D36D5] to-[#46067A] bg-clip-text text-transparent italic">IMPACT</span>
+          THE <span className="inline-block pr-[0.08em] bg-gradient-to-r from-[#8D36D5] to-[#46067A] bg-clip-text text-transparent italic">IMPACT</span>
         </h2>
       </motion.div>
 

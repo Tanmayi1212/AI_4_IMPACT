@@ -17,7 +17,6 @@ const navItems = [
 ];
 
 const actionItems = [
-  { label: "Register Now", href: "/register" },
   { label: "Login", href: "/auth" },
 ];
 

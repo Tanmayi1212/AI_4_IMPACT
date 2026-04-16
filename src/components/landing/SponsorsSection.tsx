@@ -12,17 +12,20 @@ const regularSponsors = [
 
 export default function SponsorsSection() {
   return (
-    <section id="sponsors" className="landing-section px-2 sm:px-8 lg:px-12 max-w-7xl mx-auto">
+    <section
+      id="sponsors"
+      className="landing-section px-2 sm:px-8 lg:px-12 max-w-7xl mx-auto"
+    >
       <motion.div
         initial={{ opacity: 0, x: -20 }}
         whileInView={{ opacity: 1, x: 0 }}
         viewport={{ once: true }}
         transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] as const }}
-        className="mb-8 text-center md:text-left"
+        className="mb-6 text-center md:text-left"
       >
         <h2 className="type-h2 font-black tracking-tighter text-white">
           THE{" "}
-          <span className="bg-gradient-to-r from-[#8D36D5] to-[#46067A] bg-clip-text text-transparent italic">
+          <span className="inline-block pr-[0.08em] bg-gradient-to-r from-[#8D36D5] to-[#46067A] bg-clip-text text-transparent italic">
             PARTNERS
           </span>
         </h2>
@@ -34,7 +37,7 @@ export default function SponsorsSection() {
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true }}
         transition={{ duration: 0.8 }}
-        className="group relative mx-auto mb-10 flex min-h-[148px] w-full max-w-5xl flex-col items-center justify-center p-0 md:min-h-[184px]"
+        className="group relative mx-auto mb-8 flex min-h-[140px] w-full max-w-5xl flex-col items-center justify-center p-0 md:min-h-[180px]"
       >
         {/* SVG BACKGROUND */}
         <svg
@@ -45,11 +48,23 @@ export default function SponsorsSection() {
           xmlns="http://www.w3.org/2000/svg"
         >
           <defs>
-            <linearGradient id="sponsor-sci-fi-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <linearGradient
+              id="sponsor-sci-fi-gradient"
+              x1="0%"
+              y1="0%"
+              x2="100%"
+              y2="100%"
+            >
               <stop offset="0%" stopColor="#46067A" stopOpacity="0.45" />
               <stop offset="100%" stopColor="#1b0f2d" stopOpacity="0.8" />
             </linearGradient>
-            <linearGradient id="sponsor-border-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <linearGradient
+              id="sponsor-border-gradient"
+              x1="0%"
+              y1="0%"
+              x2="100%"
+              y2="100%"
+            >
               <stop offset="0%" stopColor="#8D36D5" />
               <stop offset="100%" stopColor="#46067A" />
             </linearGradient>
@@ -79,17 +94,17 @@ export default function SponsorsSection() {
         {/* CONTENT */}
         <div className="relative z-10 flex flex-col items-center justify-center text-center px-4">
           
-          {/* 🔼 Bigger Logo */}
+          {/* 🔼 Bigger + Wider Logo */}
           <Image
             src="/kavion.png"
             alt="Kavion.ai Logo"
-            width={220}
-            height={120}
-            className="mb-2 h-auto w-[160px] sm:w-[180px] object-contain drop-shadow-[0_0_12px_rgba(255,255,255,0.15)]"
+            width={2000}
+            height={200}
+            className="mb-1 h-auto w-[220px] sm:w-[340px] md:w-[420px] object-contain drop-shadow-[0_0_14px_rgba(255,255,255,0.2)]"
           />
 
-          {/* 🔽 Fixed Description */}
-          <p className="text-[1.25rem] text-zinc-400 max-w-lg leading-snug">
+          {/* 🔽 Reduced Gap Text */}
+          <p className="text-[1.2rem] text-zinc-400 max-w-xl leading-snug">
             The Governed Intelligence Layer for the Enterprise. Kavion transforms
             unstructured, business-critical documents into continuous, validated
             commercial intelligence.

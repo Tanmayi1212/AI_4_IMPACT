@@ -412,28 +412,6 @@ export default function TeamLeadDashboard() {
                     <StatusBadge status={dashboard.payment?.status} />
                   </div>
 
-                  {/* View Receipt */}
-                  <div className="flex flex-col gap-3 min-w-[160px]">
-                    <span className="text-[12px] font-black text-zinc-500 tracking-[0.3em] uppercase opacity-0 select-none">_</span>
-                    {dashboard.payment?.screenshot_url ? (
-                      <a
-                        href={dashboard.payment.screenshot_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="group relative flex w-full items-center justify-center overflow-hidden rounded-2xl py-4 transition-all hover:scale-[1.03] active:scale-[0.98] shadow-2xl"
-                      >
-                        <div className="absolute inset-0 bg-white transition-all duration-300 group-hover:bg-[#00FFFF]" />
-                        <span className="relative text-base font-black uppercase tracking-[0.15em] text-black whitespace-nowrap">
-                          VIEW RECEIPT
-                        </span>
-                      </a>
-                    ) : (
-                      <div className="w-full py-4 rounded-2xl border-2 border-dashed border-white/10 text-center">
-                        <span className="text-sm font-bold tracking-[0.2em] uppercase text-zinc-600">NO RECEIPT</span>
-                      </div>
-                    )}
-                  </div>
-
                 </div>
               </DashboardCard>
             </motion.div>

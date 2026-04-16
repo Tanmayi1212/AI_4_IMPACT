@@ -134,7 +134,7 @@ export default function TimelineSection() {
       >
         <div className="flex items-center justify-between mb-2">
           <h2 className="type-h2 font-black tracking-tighter text-white">
-            THE <span className="bg-gradient-to-r from-[#8D36D5] to-[#46067A] bg-clip-text text-transparent italic">TIMELINE</span>
+            THE <span className="inline-block pr-[0.08em] bg-gradient-to-r from-[#8D36D5] to-[#46067A] bg-clip-text text-transparent italic">TIMELINE</span>
           </h2>
         </div>
       </motion.div>
