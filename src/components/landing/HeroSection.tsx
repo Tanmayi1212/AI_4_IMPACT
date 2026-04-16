@@ -98,11 +98,12 @@ export default function HeroSection() {
         >
           <div className="mb-8 flex justify-start">
             <Image
-              src="/logo-w.svg"
+              src="/logo-w.png"
               alt="AI4 Impact logo"
-              width={380}
-              height={164}
-              className="h-auto w-[220px] sm:w-[280px] lg:w-[340px]"
+              width={1587}
+              height={940}
+              sizes="(max-width: 640px) 78vw, (max-width: 1024px) 280px, 340px"
+              className="h-auto w-[min(78vw,220px)] sm:w-[min(42vw,280px)] lg:w-[340px]"
               style={{ filter: "drop-shadow(0 0 24px rgba(141, 54, 213, 0.3))" }}
               priority
             />

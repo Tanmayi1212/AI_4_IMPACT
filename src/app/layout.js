@@ -1,6 +1,5 @@
 import "./globals.css";
 import localFont from "next/font/local";
-import SmoothScroll from "../components/SmoothScroll";
 import { CustomHUDScrollbar } from "../components/ui/custom-hud-scrollbar";
 import LandingNavbar from "../components/landing/LandingNavbar";
 
@@ -55,7 +54,7 @@ export default function RootLayout({ children }) {
         className={`${headingFont.variable} ${bodyFont.variable} antialiased selection:bg-fuchsia-500/30 selection:text-fuchsia-200`}
       >
         <LandingNavbar />
-        <SmoothScroll>{children}</SmoothScroll>
+        {children}
       </body>
     </html>
   );

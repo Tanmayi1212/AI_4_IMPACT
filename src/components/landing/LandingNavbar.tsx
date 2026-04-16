@@ -160,7 +160,9 @@ export default function LandingNavbar() {
   return (
     <header 
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
-        scrolled ? "py-2 bg-[#0F061C]/95 backdrop-blur-xl border-b border-white/10 lg:bg-transparent lg:backdrop-blur-none lg:border-transparent" : "py-4 bg-transparent"
+        scrolled
+          ? "py-2 bg-transparent border-transparent lg:bg-[#0F061C]/95 lg:backdrop-blur-xl lg:border-transparent"
+          : "py-3 lg:py-4 bg-transparent"
       }`}
     >
       {/* Scroll Progress Laser */}
@@ -171,16 +173,16 @@ export default function LandingNavbar() {
       
       <div
         className={`mx-auto w-full transition-all duration-500 ${
-          scrolled || isOpen ? "max-w-7xl px-4 sm:px-6 lg:px-8" : "max-w-none px-0"
+          scrolled || isOpen ? "max-w-7xl px-4 sm:px-6 lg:px-8" : "max-w-none px-4 sm:px-6 lg:px-0"
         }`}
       >
         <nav
-          className="relative overflow-visible border border-transparent bg-transparent px-4 py-3 sm:px-5"
+          className="relative min-h-[56px] overflow-visible border border-transparent bg-transparent px-0 py-2 sm:min-h-[60px] lg:px-4 lg:py-3"
         >
           {/* Animated Background Glow - Hidden on very small screens to prevent overflow */}
           <div className="absolute -left-20 -top-20 h-40 w-40 bg-fuchsia-600/10 blur-3xl hidden sm:block" />
           
-          <div className="relative z-10 flex w-full items-center justify-center">
+          <div className="relative z-10 flex w-full items-center justify-end lg:justify-center">
 
             {/* Desktop Nav */}
             <div className="relative z-20 hidden lg:flex items-center justify-center">
@@ -274,7 +276,8 @@ export default function LandingNavbar() {
 
             <button 
               onClick={toggleMenu}
-              className="touch-target group relative z-[100] ml-auto flex h-11 w-11 items-center justify-center rounded-[2px] bg-white/5 text-white transition-all hover:bg-white/10 lg:hidden sm:h-12 sm:w-12"
+              className="touch-target group relative z-[100] flex h-11 w-11 items-center justify-center bg-transparent text-white transition-colors hover:text-white/80 lg:hidden sm:h-12 sm:w-12"
+              aria-label={isOpen ? "Close navigation menu" : "Open navigation menu"}
             >
               <AnimatePresence mode="wait">
                 <motion.div
@@ -303,13 +306,13 @@ export default function LandingNavbar() {
             exit="closed"
             className="fixed inset-0 z-[90] flex min-h-screen w-full flex-col bg-black/98 backdrop-blur-3xl lg:hidden"
           >
-            <div className="flex h-full flex-col justify-center px-10 pt-24 pb-12 overflow-y-auto">
+            <div className="flex h-full flex-col px-6 pb-6 pt-20 sm:px-8 sm:pb-8 sm:pt-24">
               <div className="scanning-ray opacity-20" />
               {/* Decorative Background Labels */}
               <div className="absolute right-10 top-32 text-[10vw] font-black text-white/[0.03] pointer-events-none uppercase">NAV_LAYER</div>
               
-              <nav className="relative z-10 w-full mb-auto mt-auto">
-                <ul className="flex flex-col gap-6">
+              <nav className="relative z-10 w-full">
+                <ul className="flex flex-col gap-3 sm:gap-4">
                   {navItems.map((item, idx) => {
                     const isActive = activeSection === item.href.slice(1);
                     return (
@@ -317,12 +320,12 @@ export default function LandingNavbar() {
                         <a
                           href={item.href}
                           onClick={closeMenu}
-                          className={`touch-target group relative flex items-center justify-between py-1 text-[clamp(2rem,8vw,3.75rem)] font-black uppercase tracking-tighter transition-all ${
+                          className={`touch-target group relative flex items-center justify-between py-0.5 text-[clamp(1.45rem,6vw,2.5rem)] font-black uppercase tracking-tight transition-all ${
                             isActive ? "text-white drop-shadow-[0_0_12px_rgba(255,255,255,0.4)]" : "text-zinc-300 hover:text-white"
                           }`}
                         >
-                          <div className="flex items-center gap-4">
-                            <span className="text-[10px] font-bold tracking-[0.5em] text-[#8D36D5] opacity-50">/0{idx + 1}</span>
+                          <div className="flex items-center gap-3">
+                            <span className="text-[9px] font-bold tracking-[0.35em] text-[#8D36D5] opacity-55">/0{idx + 1}</span>
                             {item.label}
                           </div>
                           {isActive && <motion.div layoutId="active-dot" className="h-2 w-2 bg-cyan-400" />}
@@ -333,25 +336,17 @@ export default function LandingNavbar() {
                 </ul>
               </nav>
 
-              <motion.div variants={itemVariants} className="mt-16 w-full">
+              <motion.div variants={itemVariants} className="mt-6 w-full sm:mt-8">
                 <div className="grid gap-3">
-                  <Link
-                    href="/register"
-                    onClick={closeMenu}
-                    className="touch-target group relative flex w-full items-center justify-center overflow-hidden rounded-[4px] bg-white py-6 text-base font-black uppercase tracking-[0.4em] text-black shadow-2xl transition-colors hover:bg-zinc-100"
-                  >
-                    <div className="absolute inset-0 bg-gradient-to-r from-[#8D36D5] to-[#46067A] opacity-0 transition-opacity group-hover:opacity-10" />
-                    REGISTER NOW
-                  </Link>
                   <Link
                     href="/auth"
                     onClick={closeMenu}
-                    className="touch-target flex w-full items-center justify-center rounded-[4px] border border-white/10 bg-white/5 py-4 text-sm font-black uppercase tracking-[0.3em] text-white transition-colors hover:bg-white/10"
+                    className="touch-target flex w-full items-center justify-center rounded-[4px] border border-white/10 bg-white/5 py-3 text-xs font-black uppercase tracking-[0.28em] text-white transition-colors hover:bg-white/10"
                   >
                     LOGIN
                   </Link>
                 </div>
-                <div className="mt-8 flex items-center justify-center gap-4 text-[8px] font-bold tracking-[0.4em] text-zinc-600 uppercase">
+                <div className="mt-5 flex items-center justify-center gap-3 text-[7px] font-bold tracking-[0.32em] text-zinc-600 uppercase sm:mt-6">
                   <div className="h-[1px] w-6 bg-zinc-800" />
                   Secure Terminal Protocol 0x4f
                   <div className="h-[1px] w-6 bg-zinc-800" />
