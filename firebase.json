@@ -5,6 +5,14 @@
     "cleanUrls": true,
     "rewrites": [
       {
+        "source": "/problem-statements",
+        "run": {
+          "serviceId": "ai4impact-backend",
+          "region": "us-central1",
+          "pinTag": true
+        }
+      },
+      {
         "source": "/api/**",
         "run": {
           "serviceId": "ai4impact-backend",
