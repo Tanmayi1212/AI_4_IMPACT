@@ -15,9 +15,9 @@ const PROBLEM_SELECTION_WORKSHEET =
   String(
     ENV.TEAM_PS_SHEET_WORKSHEET_OVERRIDE ||
       ENV.TEAM_PS_SHEET_WORKSHEET ||
-      "ProblemSelections"
+      "Sheet2"
   ).trim() ||
-  "ProblemSelections";
+  "Sheet2";
 
 const SUBMISSION_WORKSHEET =
   String(

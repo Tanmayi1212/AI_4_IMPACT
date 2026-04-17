@@ -161,6 +161,8 @@ function StatusBadge({ status }) {
 export default function TeamLeadDashboard() {
   const router = useRouter();
 
+  const DEMO_MODE = false;
+
   const [authChecking, setAuthChecking] = useState(true);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
@@ -171,6 +173,8 @@ export default function TeamLeadDashboard() {
   const [selectionError, setSelectionError] = useState("");
   const [selectionMessage, setSelectionMessage] = useState("");
   const [nowMs, setNowMs] = useState(() => Date.now());
+  const [showConfirmation, setShowConfirmation] = useState(false);
+  const [confirmationInput, setConfirmationInput] = useState("");
 
   const pollTimerRef = useRef(null);
   const dashboardRef = useRef(null);
@@ -231,10 +235,9 @@ export default function TeamLeadDashboard() {
     let isActive = true;
 
     // PRODUCTION_MODE: Restoring security and live data fetching
-    const DEMO_MODE = false;
-
+    
     if (DEMO_MODE) {
-      // (Demo logic bypassed)
+      // (Demo logic removed for production)
       return;
     }
 
@@ -396,6 +399,8 @@ export default function TeamLeadDashboard() {
 
     setSelectionDialogProblem(null);
     setSelectionError("");
+    setShowConfirmation(false);
+    setConfirmationInput("");
   }, [selectionSubmitting]);
 
   const openSelectionDialog = useCallback((problem) => {
@@ -406,10 +411,17 @@ export default function TeamLeadDashboard() {
     setSelectionMessage("");
     setSelectionError("");
     setSelectionDialogProblem(problem);
+    setShowConfirmation(false);
+    setConfirmationInput("");
   }, [selectionSubmitting]);
 
   const handleConfirmProblemSelection = useCallback(async () => {
     if (!user || !selectionDialogProblem || selectionSubmitting) {
+      return;
+    }
+
+    if (confirmationInput.toUpperCase() !== "YES") {
+      setSelectionError("Please type 'YES' to confirm.");
       return;
     }
 
@@ -436,6 +448,8 @@ export default function TeamLeadDashboard() {
       }
 
       setSelectionDialogProblem(null);
+      setShowConfirmation(false);
+      setConfirmationInput("");
       setSelectionMessage(
         data?.message || "Problem statement selected and locked successfully."
       );
@@ -488,6 +502,7 @@ export default function TeamLeadDashboard() {
   );
 
   const releaseAtMs = toMillis(problemControlState?.releaseAt || DEFAULT_PROBLEM_RELEASE_AT);
+  const selectionExpiryMs = Number.isFinite(releaseAtMs) ? releaseAtMs + 20 * 60 * 1000 : null;
   const freezeCloseAtMs = toMillis(freezeControlState?.closeAt);
   const freezeOpenAtMs = toMillis(freezeControlState?.openAt);
 
@@ -522,11 +537,22 @@ export default function TeamLeadDashboard() {
 
     if (
       problemStatus === "LIVE" &&
+      Number.isFinite(selectionExpiryMs) &&
+      nowMs < selectionExpiryMs
+    ) {
+      return {
+        label: "SELECTION WINDOW CLOSES IN",
+        targetMs: selectionExpiryMs,
+      };
+    }
+
+    if (
+      problemStatus === "LIVE" &&
       freezeStatus === "OPEN" &&
       Number.isFinite(freezeCloseAtMs)
     ) {
       return {
-        label: "SELECTION WINDOW CLOSES IN",
+        label: "ADMIN FREEZE IN",
         targetMs: freezeCloseAtMs,
       };
     }
@@ -554,11 +580,19 @@ export default function TeamLeadDashboard() {
     : "";
 
   const canSelectProblem =
-    problemStatus === "LIVE" && !hasSelectedProblem && !teamFrozen && freezeStatus !== "CLOSED";
+    problemStatus === "LIVE" && 
+    !hasSelectedProblem && 
+    !teamFrozen && 
+    freezeStatus !== "CLOSED" &&
+    (DEMO_MODE || (Number.isFinite(selectionExpiryMs) && nowMs < selectionExpiryMs));
 
   const problemSelectionHint = useMemo(() => {
     if (teamFrozen) {
       return "Team workspace is frozen. Problem statement changes are locked.";
+    }
+
+    if (problemStatus === "LIVE" && Number.isFinite(selectionExpiryMs) && nowMs >= selectionExpiryMs && !DEMO_MODE) {
+      return "Problem statements selection is freezed (20-minute window elapsed).";
     }
 
     if (freezeStatus === "CLOSED") {
@@ -887,55 +921,66 @@ export default function TeamLeadDashboard() {
                         <h3 className="text-[clamp(1.2rem,4vw,2.8rem)] font-black text-white uppercase mb-6 sm:mb-10 leading-tight tracking-tighter drop-shadow-2xl pr-20 sm:pr-28">
                           {dashboard.selected_problem.problem_title}
                         </h3>
-                        <p className="text-sm sm:text-base font-medium leading-relaxed text-zinc-200 max-w-3xl mb-6 sm:mb-8">
+                        <p className="text-sm sm:text-base font-medium leading-relaxed text-zinc-200 max-w-3xl mb-6 sm:mb-8 font-[var(--font-body)]">
                           {dashboard.selected_problem.problem_description || "Problem statement locked for your team."}
                         </p>
                         <div className="flex flex-col sm:flex-row sm:flex-wrap items-start sm:items-center gap-5 sm:gap-10 pt-6 sm:pt-10 border-t border-white/20">
                           <div className="flex flex-col gap-2">
-                            <span className="text-[11px] font-black text-zinc-500 uppercase tracking-widest">CHALLENGE ID</span>
+                            <span className="text-[11px] font-black text-zinc-500 uppercase tracking-widest font-[var(--font-body)]">CHALLENGE ID</span>
                             <span className="text-base sm:text-lg font-black text-[#8D36D5] font-mono bg-[#8D36D5]/20 px-4 py-2 sm:px-6 sm:py-2.5 rounded-xl border border-[#8D36D5]/40 shadow-xl inline-block">
                               #{dashboard.selected_problem.problem_id}
                             </span>
                           </div>
                           <div className="flex flex-col gap-2">
-                            <span className="text-[11px] font-black text-zinc-500 uppercase tracking-widest">LOCK DATE</span>
+                            <span className="text-[11px] font-black text-zinc-500 uppercase tracking-widest font-[var(--font-body)]">LOCK DATE</span>
                             <span className="text-base font-bold text-zinc-100 font-mono italic">{dashboard.selected_problem.selected_at || "Recorded"}</span>
                           </div>
                         </div>
                       </div>
                     ) : canSelectProblem && problemStatements.length > 0 ? (
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
                         {problemStatements.map((problem) => {
-                          const isFull = problem?.is_full === true || Number(problem?.available_slots || 0) <= 0;
+                          const isFull = problem?.is_full === true || (problem?.available_slots !== undefined ? Number(problem.available_slots) <= 0 : false);
 
                           return (
-                            <article
+                            <motion.article
                               key={problem.problem_id}
-                              className="rounded-2xl border border-white/10 bg-white/[0.04] p-5 sm:p-6 transition-all hover:border-[#8D36D5]/50 hover:bg-white/[0.07]"
+                              whileHover={{ y: -5, scale: 1.02 }}
+                              className="relative group rounded-[32px] border border-white/10 bg-[#0F061C]/50 p-6 sm:p-8 transition-all hover:border-[#00FFFF]/40 hover:bg-[#0F061C]/80 cursor-pointer overflow-hidden backdrop-blur-xl"
+                              onClick={() => openSelectionDialog(problem)}
                             >
-                              <p className="text-[10px] font-black tracking-[0.22em] uppercase text-zinc-500">
-                                {problem.category || "General"}
+                              <div className="absolute top-0 right-0 p-4">
+                                <span className={`text-[10px] font-black px-4 py-2 rounded-xl border-2 tracking-widest uppercase font-[var(--font-body)] shadow-lg ${isFull ? 'bg-rose-500/20 border-rose-500/50 text-rose-400' : 'bg-[#00FFFF]/20 border-[#00FFFF]/50 text-[#00FFFF]'}`}>
+                                  {isFull ? "FULL" : `${problem.selected_teams_count || 0}/${problem.max_teams_allowed || 8}`}
+                                </span>
+                              </div>
+
+                              <p className="text-[10px] font-black tracking-[0.3em] uppercase text-zinc-500 mt-2 font-[var(--font-body)]">
+                                {problem.problem_id}
                               </p>
-                              <h3 className="mt-2 text-lg sm:text-xl font-black text-white tracking-tight leading-tight">
+                              <h3 className="mt-3 text-xl font-black text-white tracking-tight leading-tight group-hover:text-[#00FFFF] transition-colors pr-16 line-clamp-2">
                                 {problem.title}
                               </h3>
-                              <p className="mt-3 text-sm text-zinc-300 leading-relaxed line-clamp-3">
+                              <p className="mt-5 text-sm text-zinc-400 leading-relaxed line-clamp-4 font-[var(--font-body)] tracking-wide">
                                 {problem.description || "Problem statement details will be updated shortly."}
                               </p>
-                              <div className="mt-4 flex items-center justify-between gap-3">
-                                <p className="text-[11px] font-black tracking-[0.14em] uppercase text-cyan-300">
-                                  {problem.selected_teams_count || 0}/{problem.max_teams_allowed || 5} teams
-                                </p>
-                                <button
-                                  type="button"
-                                  disabled={isFull || selectionSubmitting}
-                                  onClick={() => openSelectionDialog(problem)}
-                                  className="rounded-xl border border-[#8D36D5]/40 bg-[#8D36D5]/20 px-4 py-2 text-[11px] font-black tracking-[0.18em] uppercase text-white transition-all hover:bg-[#8D36D5]/35 disabled:opacity-40 disabled:cursor-not-allowed"
-                                >
-                                  {isFull ? "FULL" : "Preview & Freeze"}
-                                </button>
+
+                              <div className="mt-8 flex items-center justify-between border-t border-white/5 pt-6">
+                                <span className="text-[10px] font-black text-zinc-600 tracking-widest uppercase font-[var(--font-body)] group-hover:text-[#00FFFF]/50 transition-colors">
+                                  {isFull ? "CAPACITY REACHED" : "AVAILABLE FOR SELECTION"}
+                                </span>
+                                <div className="flex items-center gap-2 group-hover:translate-x-1 transition-transform">
+                                  <span className="text-[10px] font-black text-[#00FFFF] tracking-widest uppercase font-[var(--font-body)]">VIEW DETAILS</span>
+                                  <svg className="w-4 h-4 text-[#00FFFF]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                                  </svg>
+                                </div>
                               </div>
-                            </article>
+
+                              {/* Decoration */}
+                              <div className="absolute top-0 left-0 w-16 h-16 bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
+                              <div className="absolute -inset-[100%] bg-gradient-to-r from-transparent via-white/5 to-transparent -rotate-45 group-hover:animate-shine pointer-events-none" />
+                            </motion.article>
                           );
                         })}
                       </div>
@@ -996,62 +1041,138 @@ export default function TeamLeadDashboard() {
       <AnimatePresence>
         {selectionDialogProblem ? (
           <motion.div
-            className="fixed inset-0 z-[130] bg-black/85 backdrop-blur-sm px-4 py-8 flex items-center justify-center"
+            className="fixed inset-0 z-[130] bg-black/95 backdrop-blur-xl px-4 py-8 flex items-center justify-center overflow-y-auto"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={closeSelectionDialog}
           >
             <motion.section
-              className="w-full max-w-2xl rounded-3xl border border-white/15 bg-[#0b0615] p-6 sm:p-8 shadow-[0_40px_120px_rgba(0,0,0,0.8)]"
-              initial={{ y: 24, opacity: 0.96 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 24, opacity: 0.96 }}
+              className="w-full max-w-2xl rounded-[40px] border border-white/10 bg-[#0F061C]/90 p-8 sm:p-12 shadow-[0_40px_120px_rgba(0,0,0,0.9)] relative overflow-hidden"
+              initial={{ y: 50, opacity: 0, scale: 0.95 }}
+              animate={{ y: 0, opacity: 1, scale: 1 }}
+              exit={{ y: 50, opacity: 0, scale: 0.95 }}
               onClick={(event) => event.stopPropagation()}
             >
-              <p className="text-[10px] font-black tracking-[0.32em] uppercase text-zinc-500">
-                Confirm Freeze
-              </p>
-              <h3 className="mt-2 text-2xl sm:text-3xl font-black text-white tracking-tight">
-                {selectionDialogProblem.title}
-              </h3>
-              <p className="mt-4 text-sm sm:text-base leading-relaxed text-zinc-300">
-                {selectionDialogProblem.description || "Problem statement details are unavailable."}
-              </p>
+              {/* Animated Background Decoration */}
+              <div className="absolute top-0 right-0 w-32 h-32 bg-[#8D36D5]/10 rounded-full blur-3xl pointer-events-none" />
+              <div className="absolute bottom-0 left-0 w-32 h-32 bg-[#00FFFF]/10 rounded-full blur-3xl pointer-events-none" />
 
-              <div className="mt-5 rounded-2xl border border-cyan-400/25 bg-cyan-500/10 px-4 py-3">
-                <p className="text-[11px] font-black tracking-[0.2em] uppercase text-cyan-300">
-                  Teams Selected: {selectionDialogProblem.selected_teams_count || 0}/{selectionDialogProblem.max_teams_allowed || 5}
-                </p>
-                <p className="mt-2 text-xs sm:text-sm text-zinc-300 leading-relaxed">
-                  Once you confirm, this problem statement will be locked for your team and cannot be changed later.
-                </p>
-              </div>
+              {!showConfirmation ? (
+                /* STEP 1: Detailed View */
+                <div className="relative z-10">
+                  <div className="flex justify-between items-start mb-8">
+                    <div className="flex flex-col gap-2">
+                      <p className="text-[10px] font-black tracking-[0.4em] uppercase text-[#00FFFF] font-[var(--font-body)]">
+                        PROBLEM_DETAIL_VIEW
+                      </p>
+                      <h3 className="text-3xl sm:text-4xl font-black text-white tracking-tight leading-tight uppercase">
+                        {selectionDialogProblem.title}
+                      </h3>
+                    </div>
+                    <button
+                      onClick={closeSelectionDialog}
+                      className="h-10 w-10 rounded-full bg-white/5 flex items-center justify-center text-zinc-500 hover:text-white transition-colors"
+                    >
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
 
-              {selectionError ? (
-                <div className="mt-4 rounded-2xl border border-rose-400/30 bg-rose-500/10 px-4 py-3 text-sm font-semibold text-rose-200">
-                  {selectionError}
+                  <div className="flex items-center gap-6 mb-8 p-6 bg-white/5 rounded-3xl border border-white/5">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[10px] font-black text-zinc-500 tracking-widest uppercase font-[var(--font-body)]">IDENTIFIER</span>
+                      <span className="text-xl font-black text-white font-mono">#{selectionDialogProblem.problem_id}</span>
+                    </div>
+                    <div className="h-10 w-px bg-white/10" />
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[10px] font-black text-zinc-500 tracking-widest uppercase font-[var(--font-body)]">CAPACITY</span>
+                      <span className="text-xl font-black text-[#00FFFF] font-[var(--font-body)]">
+                        {selectionDialogProblem.selected_teams_count || 0} / {selectionDialogProblem.max_teams_allowed || 8}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="max-h-[300px] overflow-y-auto pr-4 custom-scrollbar mb-10">
+                    <p className="text-base sm:text-lg leading-relaxed text-zinc-300 font-[var(--font-body)] tracking-wide">
+                      {selectionDialogProblem.description || "Problem statement details are unavailable."}
+                    </p>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row gap-4">
+                    <button
+                      type="button"
+                      onClick={closeSelectionDialog}
+                      className="flex-1 px-8 py-5 rounded-2xl border border-white/10 bg-white/5 text-[11px] font-black tracking-[0.2em] uppercase text-zinc-400 transition-all hover:bg-white/10 hover:text-white"
+                    >
+                      Go Back
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmation(true)}
+                      className="flex-[2] px-8 py-5 rounded-2xl bg-[#00FFFF] text-[#0F061C] text-[11px] font-black tracking-[0.2em] uppercase transition-all hover:scale-[1.02] active:scale-[0.98] shadow-[0_10px_30px_rgba(0,255,255,0.3)]"
+                    >
+                      Proceed to Select
+                    </button>
+                  </div>
                 </div>
-              ) : null}
+              ) : (
+                /* STEP 2: Confirmation View */
+                <div className="relative z-10">
+                  <div className="text-center mb-8">
+                    <div className="h-20 w-20 rounded-full bg-rose-500/10 border-2 border-rose-500/20 flex items-center justify-center mx-auto mb-6 text-rose-500">
+                      <svg className="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                    </div>
+                    <h3 className="text-2xl font-black text-white uppercase tracking-tight mb-3">Permanent Lock-In</h3>
+                    <p className="text-zinc-400 text-sm leading-relaxed font-[var(--font-body)]">
+                      Are you sure? You <span className="text-rose-400 font-bold uppercase underline">cannot revert</span> this decision once frozen.
+                      Our systems will record your selection immediately.
+                    </p>
+                  </div>
 
-              <div className="mt-6 flex flex-col sm:flex-row gap-3 sm:justify-end">
-                <button
-                  type="button"
-                  onClick={closeSelectionDialog}
-                  disabled={selectionSubmitting}
-                  className="rounded-xl border border-white/15 bg-white/[0.06] px-5 py-3 text-[11px] font-black tracking-[0.2em] uppercase text-zinc-100 transition-colors hover:bg-white/[0.12] disabled:opacity-40"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleConfirmProblemSelection}
-                  disabled={selectionSubmitting}
-                  className="rounded-xl border border-[#8D36D5]/45 bg-[#8D36D5]/25 px-5 py-3 text-[11px] font-black tracking-[0.2em] uppercase text-white transition-colors hover:bg-[#8D36D5]/38 disabled:opacity-50"
-                >
-                  {selectionSubmitting ? "Locking..." : "Yes, Freeze This Problem"}
-                </button>
-              </div>
+                  <div className="space-y-4 mb-8">
+                    <p className="text-[10px] font-black text-rose-500 text-center tracking-[0.3em] uppercase font-[var(--font-body)]">
+                      Type <span className="px-2 py-0.5 bg-rose-500 text-white rounded font-mono font-bold">YES</span> to confirm
+                    </p>
+                    <input
+                      type="text"
+                      autoFocus
+                      placeholder="Type YES here..."
+                      value={confirmationInput}
+                      onChange={(e) => setConfirmationInput(e.target.value)}
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-5 text-center font-black text-xl text-white placeholder:text-zinc-800 focus:outline-none focus:border-rose-500 transition-all uppercase font-mono"
+                    />
+                  </div>
+
+                  {selectionError && (
+                    <div className="mb-6 p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-bold text-center uppercase tracking-widest animate-shake">
+                      {selectionError}
+                    </div>
+                  )}
+
+                  <div className="flex flex-col sm:flex-row gap-4">
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmation(false)}
+                      disabled={selectionSubmitting}
+                      className="flex-1 px-8 py-5 rounded-2xl border border-white/10 bg-white/5 text-[11px] font-black tracking-[0.2em] uppercase text-zinc-400 transition-all hover:bg-white/10"
+                    >
+                      Go Back
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleConfirmProblemSelection}
+                      disabled={selectionSubmitting || confirmationInput.toUpperCase() !== "YES"}
+                      className="flex-[2] px-8 py-5 rounded-2xl bg-rose-500 text-white text-[11px] font-black tracking-[0.2em] uppercase transition-all hover:bg-rose-600 disabled:opacity-20 disabled:grayscale shadow-[0_10px_30px_rgba(244,63,94,0.3)]"
+                    >
+                      {selectionSubmitting ? "FREEZING..." : "FREEZE SELECTION"}
+                    </button>
+                  </div>
+                </div>
+              )}
             </motion.section>
           </motion.div>
         ) : null}

@@ -145,7 +145,7 @@ export default function ProblemStatementsPublicView({ statements = [] }) {
         <div className="absolute inset-0 bg-[linear-gradient(rgba(141,54,213,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(141,54,213,0.08)_1px,transparent_1px)] bg-[size:90px_90px]" />
       </div>
 
-      <div className="relative z-10 mx-auto w-full max-w-6xl px-5 py-10 sm:px-8 lg:px-12">
+      <div className="relative z-10 mx-auto w-full max-w-6xl px-5 pt-32 pb-10 sm:px-8 lg:px-12">
         <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-10">
           <div>
             <p className="text-[10px] font-black tracking-[0.34em] uppercase text-zinc-500">

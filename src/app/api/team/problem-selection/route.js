@@ -52,6 +52,14 @@ function normalizeRole(role) {
   return normalized;
 }
 
+function toMillis(value) {
+  if (!value) return NaN;
+  if (typeof value?.toMillis === "function") return value.toMillis();
+  if (typeof value === "number") return value;
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? NaN : parsed;
+}
+
 function toIstDateLabel(value) {
   const date = new Date(String(value || ""));
   if (Number.isNaN(date.getTime())) {
@@ -268,6 +276,17 @@ export async function POST(request) {
       return forbidden(buildProblemWindowClosedMessage(problemStatementsState), {
         problem_statements: problemStatementsState,
       });
+    }
+
+    const releaseAtMs = toMillis(problemStatementsState?.releaseAt);
+    if (Number.isFinite(releaseAtMs)) {
+      const selectionExpiryMs = releaseAtMs + 20 * 60 * 1000;
+      if (Date.now() >= selectionExpiryMs) {
+        return forbidden("Problem statement selection has closed (20-minute window elapsed).", {
+          release_at: problemStatementsState.releaseAt,
+          expiry_at: new Date(selectionExpiryMs).toISOString(),
+        });
+      }
     }
 
     if (asTrimmedString(freezeState?.status).toUpperCase() === "CLOSED") {
