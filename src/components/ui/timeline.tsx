@@ -39,15 +39,17 @@ export const Timeline = ({
               <div className="sticky top-40 z-40 flex max-w-xs flex-col items-center self-start md:w-full md:flex-row lg:max-w-sm">
                 <div className="absolute left-3 flex h-10 w-10 items-center justify-center rounded-full bg-black md:left-3">
                   {/* The glowing neon dot */}
-                  <div className={`h-4 w-4 rounded-full border-2 bg-black transition-all duration-500 ${
+                  <div className={`h-4 w-4 rounded-full border-2 transition-all duration-500 ${
                     isActive 
-                      ? "border-[#8D36D5] shadow-[0_0_20px_rgba(141,54,213,0.9)] scale-125" 
+                      ? item.title.toUpperCase().includes("HACKATHON STARTS")
+                        ? "border-[#00FFFF] bg-[#8D36D5] shadow-[0_0_20px_rgba(0,255,255,0.9)] scale-125"
+                        : "border-[#8D36D5] bg-[#8D36D5] shadow-[0_0_20px_rgba(141,54,213,0.9)] scale-125" 
                       : isCompleted
                         ? "border-[#8D36D5] bg-[#8D36D5]/40"
-                        : "border-[#8D36D5]/30"
+                        : "border-[#8D36D5]/30 bg-black"
                   }`} />
                   {isActive && (
-                    <div className="absolute inset-0 h-10 w-10 rounded-full border border-[#8D36D5]/50 animate-ping" />
+                    <div className={`absolute inset-0 h-10 w-10 rounded-full border ${item.title.toUpperCase().includes("HACKATHON STARTS") ? "border-[#00FFFF]/50" : "border-[#8D36D5]/50"} animate-ping`} />
                   )}
                 </div>
                 <h3 className={`hidden text-base font-black uppercase tracking-widest md:block md:pl-20 transition-colors duration-500 lg:text-xl ${

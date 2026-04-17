@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { Timeline } from "../ui/timeline";
 
@@ -78,28 +79,49 @@ const events: EventItem[] = [
 ];
 
 export default function TimelineSection() {
-  const activeIndex = 2; // Workshop Day 2
-  const completedIndices = [0, 1];
+  const now = new Date();
+  
+  // Find the current active index based on time
+  const activeIndex = useMemo(() => {
+    // We work backwards to find the last event that has started
+    for (let i = events.length - 1; i >= 0; i--) {
+      if (now >= events[i].start) {
+        return i;
+      }
+    }
+    return 0; // Default to first if nothing started
+  }, [now]);
+
+  const completedIndices = useMemo(() => {
+    const indices = [];
+    for (let i = 0; i < activeIndex; i++) {
+      indices.push(i);
+    }
+    return indices;
+  }, [activeIndex]);
 
   const data = events.map((item, idx) => {
     const isActive = idx === activeIndex;
+    const isSpecial = item.title === "Hackathon Starts";
     return {
       title: item.label,
       content: (
         <div className={`group relative w-full rounded-[4px] border transition-all duration-300 md:max-w-xl ${
           isActive 
-            ? "border-[#8D36D5] bg-[#8D36D5] shadow-[0_0_40px_rgba(141,54,213,0.15)] -translate-y-1" 
+            ? isSpecial
+               ? "border-[#00FFFF] bg-[#8D36D5] shadow-[0_0_50px_rgba(0,255,255,0.3)] -translate-y-2"
+               : "border-[#8D36D5] bg-[#8D36D5] shadow-[0_0_40px_rgba(141,54,213,0.15)] -translate-y-1" 
             : "border-white/5 bg-white/[0.01] shadow-[0_0_24px_rgba(141,54,213,0.1)]"
         }`} >
           {/* Corner Brackets */}
           <div className={`absolute -left-2 -top-2 h-8 w-8 border-l-2 border-t-2 transition-all duration-500 sm:group-hover:h-12 sm:group-hover:w-12 ${
             isActive
-              ? "border-[#FF6AC1] sm:group-hover:border-[#FF6AC1]"
+              ? isSpecial ? "border-[#00FFFF]" : "border-[#FF6AC1] sm:group-hover:border-[#FF6AC1]"
               : "border-[#8D36D5] sm:border-[#8D36D5]/40 sm:group-hover:border-[#8D36D5]"
           }`} />
           <div className={`absolute -bottom-2 -right-2 h-8 w-8 border-b-2 border-r-2 transition-all duration-500 sm:group-hover:h-12 sm:group-hover:w-12 ${
             isActive
-              ? "border-[#FF6AC1] sm:group-hover:border-[#FF6AC1]"
+              ? isSpecial ? "border-[#00FFFF]" : "border-[#FF6AC1] sm:group-hover:border-[#FF6AC1]"
               : "border-[#8D36D5] sm:border-[#8D36D5]/40 sm:group-hover:border-[#8D36D5]"
           }`} />
           <div className="relative z-10 flex h-full flex-col rounded-[4px] p-6 lg:p-8">
@@ -108,7 +130,7 @@ export default function TimelineSection() {
             <div className="mb-4" />
 
             <h3 className={`relative z-10 text-xl font-black uppercase tracking-[0.08em] transition-colors duration-300 sm:text-2xl ${
-              isActive ? "text-white" : "text-white group-hover:text-[#c084fc]"
+              isActive ? (isSpecial ? "text-[#00FFFF]" : "text-white") : "text-white group-hover:text-[#c084fc]"
             }`}>
               {item.title}
             </h3>
