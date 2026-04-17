@@ -30,10 +30,10 @@ export async function POST(request) {
 
     const sheets = google.sheets({ version: 'v4', auth });
     
-    // Assumes first sheet, appending to row A to E
+    // Problem selection sync writes into Sheet2.
     await sheets.spreadsheets.values.append({
       spreadsheetId: sheetId,
-      range: 'Sheet1!A:E',
+      range: 'Sheet2!A:E',
       valueInputOption: 'USER_ENTERED',
       requestBody: {
         values: [[

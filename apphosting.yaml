@@ -76,6 +76,21 @@ env:
     availability:
       - RUNTIME
 
+  - variable: TEAM_SHEET_SYNC_ENABLED
+    value: "true"
+    availability:
+      - RUNTIME
+
+  - variable: TEAM_PS_SHEET_WORKSHEET_FORCE_OVERRIDE
+    value: "Sheet2"
+    availability:
+      - RUNTIME
+
+  - variable: PROBLEM_STATEMENT_MAX_TEAMS_PER_PROBLEM
+    value: "8"
+    availability:
+      - RUNTIME
+
   - variable: GOOGLE_SHEETS_SPREADSHEET_ID
     value: "1K-xN8FtkpG1Y5diqRPY-DksJZkkGGpkxU9mSGA5lxnU"
     availability:

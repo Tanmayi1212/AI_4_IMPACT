@@ -32,7 +32,7 @@ export default function ConfirmationModal({ onConfirm, onCancel, problemTitle })
             <div className="space-y-2">
               <h3 className="text-2xl font-black text-white uppercase tracking-tight">CRITICAL LOCKIN</h3>
               <p className="text-zinc-400 text-sm leading-relaxed">
-                You are about to select <span className="text-white font-bold">"{problemTitle}"</span>. 
+                You are about to select <span className="text-white font-bold">&quot;{problemTitle}&quot;</span>.
                 This action is <span className="text-rose-400 font-bold uppercase italic underline">permanent</span> and cannot be reversed.
               </p>
             </div>

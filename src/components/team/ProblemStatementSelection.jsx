@@ -13,11 +13,13 @@ const RELEASE_TIME = new Date("2026-04-17T11:30:00").getTime();
 const SELECTION_DURATION_MS = 20 * 60 * 1000; // 20 minutes
 
 export default function ProblemStatementSelection({ initialSelectedProblem = null }) {
-  const [now, setNow] = useState(Date.now());
+  const [now, setNow] = useState(() => Date.now());
   const [selectedProblem, setSelectedProblem] = useState(initialSelectedProblem);
   const [activeProblem, setActiveProblem] = useState(null);
   const [showConfirm, setShowConfirm] = useState(false);
-  const [liveStartTime, setLiveStartTime] = useState(null);
+  const [liveStartTime] = useState(() =>
+    IS_DEMO_MODE || Date.now() >= RELEASE_TIME ? Date.now() : RELEASE_TIME
+  );
 
   // Update time every second
   useEffect(() => {
@@ -39,13 +41,6 @@ export default function ProblemStatementSelection({ initialSelectedProblem = nul
     
     return "LIVE";
   }, [now, selectedProblem, liveStartTime]);
-
-  // Set live start time when phase transitions to LIVE
-  useEffect(() => {
-    if ((IS_DEMO_MODE || now >= RELEASE_TIME) && !liveStartTime && !selectedProblem) {
-      setLiveStartTime(now);
-    }
-  }, [now, liveStartTime, selectedProblem]);
 
   const handleSelectRequest = (problem) => {
     setActiveProblem(problem);
