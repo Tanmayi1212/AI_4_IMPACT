@@ -34,7 +34,7 @@ export async function GET(request) {
         shortDescription: data.shortDescription || data.description?.substring(0, 80) + "..." || "",
         description: data.description || "",
         selectedCount: data.selectedCount || 0,
-        maxLimit: 8
+        maxLimit: 7
       };
     });
 

@@ -955,7 +955,7 @@ export default function TeamLeadDashboard() {
                         <h3 className="text-[clamp(1.2rem,4vw,2.8rem)] font-black text-white uppercase mb-6 sm:mb-10 leading-tight tracking-tighter drop-shadow-2xl pr-20 sm:pr-28">
                           {dashboard.selected_problem.problem_title}
                         </h3>
-                        <p className="text-sm sm:text-base font-medium leading-relaxed text-zinc-200 max-w-3xl mb-6 sm:mb-8 font-[var(--font-body)]">
+                        <p className="whitespace-pre-line text-sm sm:text-base font-medium leading-relaxed text-zinc-200 max-w-3xl mb-6 sm:mb-8 font-[var(--font-body)]">
                           {dashboard.selected_problem.problem_description || "Problem statement locked for your team."}
                         </p>
                         <div className="flex flex-col sm:flex-row sm:flex-wrap items-start sm:items-center gap-5 sm:gap-10 pt-6 sm:pt-10 border-t border-white/20">
@@ -985,7 +985,7 @@ export default function TeamLeadDashboard() {
                             >
                               <div className="absolute top-0 right-0 p-4">
                                 <span className={`text-[10px] font-black px-4 py-2 rounded-xl border-2 tracking-widest uppercase font-[var(--font-body)] shadow-lg ${isFull ? 'bg-rose-500/20 border-rose-500/50 text-rose-400' : 'bg-[#00FFFF]/20 border-[#00FFFF]/50 text-[#00FFFF]'}`}>
-                                  {isFull ? "FULL" : `${problem.selected_teams_count || 0}/${problem.max_teams_allowed || 8}`}
+                                  {isFull ? "FULL" : `${problem.selected_teams_count || 0}/${problem.max_teams_allowed || 7}`}
                                 </span>
                               </div>
 
@@ -995,7 +995,7 @@ export default function TeamLeadDashboard() {
                               <h3 className="mt-3 text-xl font-black text-white tracking-tight leading-tight group-hover:text-[#00FFFF] transition-colors pr-16 line-clamp-2">
                                 {problem.title}
                               </h3>
-                              <p className="mt-5 text-sm text-zinc-400 leading-relaxed line-clamp-4 font-[var(--font-body)] tracking-wide">
+                              <p className="mt-5 whitespace-pre-line text-sm text-zinc-400 leading-relaxed line-clamp-4 font-[var(--font-body)] tracking-wide">
                                 {problem.description || "Problem statement details will be updated shortly."}
                               </p>
 
@@ -1123,13 +1123,13 @@ export default function TeamLeadDashboard() {
                     <div className="flex flex-col gap-1">
                       <span className="text-[10px] font-black text-zinc-500 tracking-widest uppercase font-[var(--font-body)]">CAPACITY</span>
                       <span className="text-xl font-black text-[#00FFFF] font-[var(--font-body)]">
-                        {selectionDialogProblem.selected_teams_count || 0} / {selectionDialogProblem.max_teams_allowed || 8}
+                        {selectionDialogProblem.selected_teams_count || 0} / {selectionDialogProblem.max_teams_allowed || 7}
                       </span>
                     </div>
                   </div>
 
                   <div className="max-h-[300px] overflow-y-auto pr-4 custom-scrollbar mb-10">
-                    <p className="text-base sm:text-lg leading-relaxed text-zinc-300 font-[var(--font-body)] tracking-wide">
+                    <p className="whitespace-pre-line text-base sm:text-lg leading-relaxed text-zinc-300 font-[var(--font-body)] tracking-wide">
                       {selectionDialogProblem.description || "Problem statement details are unavailable."}
                     </p>
                   </div>

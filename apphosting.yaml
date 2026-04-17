@@ -87,7 +87,7 @@ env:
       - RUNTIME
 
   - variable: PROBLEM_STATEMENT_MAX_TEAMS_PER_PROBLEM
-    value: "8"
+    value: "7"
     availability:
       - RUNTIME
 

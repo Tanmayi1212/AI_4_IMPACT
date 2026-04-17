@@ -206,7 +206,7 @@ export default function ProblemStatementsPublicView({ statements = [] }) {
                 <h2 className="mt-2 text-xl sm:text-2xl font-black tracking-tight text-white">
                   {statement.title}
                 </h2>
-                <p className="mt-4 text-sm sm:text-base text-zinc-300 leading-relaxed">
+                <p className="mt-4 whitespace-pre-line text-sm sm:text-base text-zinc-300 leading-relaxed">
                   {statement.description || "Description will be updated shortly."}
                 </p>
               </motion.article>
