@@ -272,10 +272,7 @@ export async function POST(request) {
     const problemStatementsState = effectiveState?.problemStatements || {};
     const freezeState = effectiveState?.freeze || {};
 
-    const teamName = String(teamData?.team_name || "").trim().toUpperCase();
-    const isBypassTeam = teamName === "STR";
-
-    if (!isBypassTeam && asTrimmedString(problemStatementsState?.status).toUpperCase() !== "LIVE") {
+    if (asTrimmedString(problemStatementsState?.status).toUpperCase() !== "LIVE") {
       return forbidden(buildProblemWindowClosedMessage(problemStatementsState), {
         problem_statements: problemStatementsState,
       });

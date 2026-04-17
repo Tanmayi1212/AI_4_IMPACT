@@ -426,6 +426,11 @@ export default function TeamLeadDashboard() {
   }, [selectionSubmitting]);
 
   const handleConfirmProblemSelection = useCallback(async () => {
+    if (confirmationInput.trim().toUpperCase() !== "YES") {
+      setSelectionError("Please type 'YES' to confirm.");
+      return;
+    }
+
     if (selectionSubmitting) return;
     setSelectionError("");
     setSelectionSubmitting(true);
@@ -591,22 +596,19 @@ export default function TeamLeadDashboard() {
     ? formatCountdown(countdownModel.targetMs - nowMs)
     : "";
 
-  const teamName = String(dashboard?.team?.team_name || "").trim().toUpperCase();
-  const isBypassTeam = teamName === "STR";
-
   const canSelectProblem =
-    (isBypassTeam || problemStatus === "LIVE") && 
+    problemStatus === "LIVE" && 
     !hasSelectedProblem && 
     !teamFrozen && 
     freezeStatus !== "CLOSED" &&
-    (DEMO_MODE || (isBypassTeam || (Number.isFinite(selectionExpiryMs) && nowMs < selectionExpiryMs)));
+    (DEMO_MODE || (Number.isFinite(selectionExpiryMs) && nowMs < selectionExpiryMs));
 
   const problemSelectionHint = useMemo(() => {
     if (teamFrozen) {
       return "Team workspace is frozen. Problem statement changes are locked.";
     }
 
-    if (problemStatus === "LIVE" && Number.isFinite(selectionExpiryMs) && nowMs >= selectionExpiryMs && !DEMO_MODE && !isBypassTeam) {
+    if (problemStatus === "LIVE" && Number.isFinite(selectionExpiryMs) && nowMs >= selectionExpiryMs && !DEMO_MODE) {
       return "Problem statements selection is freezed (20-minute window elapsed).";
     }
 
@@ -616,10 +618,6 @@ export default function TeamLeadDashboard() {
 
     if (problemStatus === "DISABLED") {
       return "Problem statements are currently disabled by admin controls.";
-    }
-
-    if (isBypassTeam) {
-      return "Testing release active for your team. You may proceed with selection.";
     }
 
     if (problemStatus === "SCHEDULED") {
@@ -1168,11 +1166,28 @@ export default function TeamLeadDashboard() {
                       Our systems will record your selection immediately.
                     </p>
                   </div>
+                  <div className="space-y-4 mb-8">
+                    <p className="text-[10px] font-black text-rose-500 text-center tracking-[0.3em] uppercase font-[var(--font-body)]">
+                      Type <span className="px-2 py-0.5 bg-rose-500 text-white rounded font-mono font-bold">YES</span> to confirm
+                    </p>
+                    <input
+                      type="text"
+                      autoFocus
+                      placeholder="Type YES here..."
+                      value={confirmationInput}
+                      onChange={(e) => {
+                        setConfirmationInput(e.target.value);
+                        if (selectionError) setSelectionError("");
+                      }}
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-5 text-center font-black text-xl text-white placeholder:text-zinc-800 focus:outline-none focus:border-rose-500 transition-all uppercase font-mono"
+                    />
+                  </div>
+
                   {selectionError && (
-                     <div className="mb-6 p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-bold text-center uppercase tracking-widest animate-shake">
-                       {selectionError}
-                     </div>
-                   )}
+                    <div className="mb-6 p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-bold text-center uppercase tracking-widest animate-shake">
+                      {selectionError}
+                    </div>
+                  )}
 
                   <div className="flex flex-col sm:flex-row gap-4">
                     <button
@@ -1186,7 +1201,7 @@ export default function TeamLeadDashboard() {
                     <button
                       type="button"
                       onClick={handleConfirmProblemSelection}
-                      disabled={selectionSubmitting}
+                      disabled={selectionSubmitting || (confirmationInput || "").trim().toUpperCase() !== "YES"}
                       className="flex-[2] px-8 py-5 rounded-2xl bg-rose-500 text-white text-[11px] font-black tracking-[0.2em] uppercase transition-all hover:bg-rose-600 disabled:opacity-20 disabled:grayscale shadow-[0_10px_30px_rgba(244,63,94,0.3)]"
                     >
                       {selectionSubmitting ? "FREEZING..." : "FREEZE SELECTION"}
