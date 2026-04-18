@@ -1,5 +1,21 @@
 import { NextResponse } from "next/server";
 import { adminAuth, adminDb } from "../../../../../firebaseAdmin";
+import { readRuntimeIdTokenFromRequest } from "../../../../../lib/runtime-auth";
+import {
+  EVENT_TIME_ZONE,
+  EVENT_TIME_ZONE_LABEL,
+  buildPublicEventState,
+} from "../../../../../lib/server/event-controls";
+import { readEventControlsFromDb } from "../../../../../lib/server/registration-gate";
+import {
+  getProblemStatementCatalog,
+  mapProblemStatementsWithCapacity,
+  MAX_TEAMS_PER_PROBLEM,
+  readProblemStatementCapacitySnapshot,
+  readTeamProblemSelection,
+} from "../../../../../lib/server/problem-statements";
+
+export const dynamic = "force-dynamic";
 
 export const runtime = "nodejs";
 
@@ -22,6 +38,22 @@ function toIsoString(value) {
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
+function toIstDateLabel(value) {
+  const date = new Date(String(value || ""));
+  if (Number.isNaN(date.getTime())) return "N/A";
+
+  return date.toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: EVENT_TIME_ZONE,
+    timeZoneName: "short",
+  });
+}
+
 function normalizeRole(role) {
   const normalized = String(role || "")
     .trim()
@@ -36,13 +68,7 @@ function normalizeRole(role) {
 }
 
 async function verifyRequestUser(request) {
-  const authHeader = request.headers.get("authorization") || "";
-
-  if (!authHeader.startsWith("Bearer ")) {
-    return { error: unauthorized("Missing or invalid Authorization header.") };
-  }
-
-  const idToken = authHeader.slice(7).trim();
+  const idToken = readRuntimeIdTokenFromRequest(request);
   if (!idToken) {
     return { error: unauthorized("Missing Firebase ID token.") };
   }
@@ -74,55 +100,25 @@ async function loadMembers(memberIds) {
     });
 }
 
-async function loadProblemStatements() {
-  try {
-    const snapshot = await adminDb
-      .collection("problem_statements")
-      .orderBy("created_at", "desc")
-      .limit(10)
-      .get();
-
-    return snapshot.docs.map((doc) => {
-      const data = doc.data();
-      return {
-        problem_id: doc.id,
-        title: data?.title || data?.name || "Untitled Problem Statement",
-        description: data?.description || "",
-        category: data?.category || "General",
-        published_at: toIsoString(data?.published_at || data?.created_at),
-      };
-    });
-  } catch {
-    return [];
-  }
-}
-
-async function loadTeamSelection(teamId) {
-  try {
-    const snapshot = await adminDb
-      .collection("team_problem_selection")
-      .where("team_id", "==", teamId)
-      .limit(1)
-      .get();
-
-    if (snapshot.empty) return null;
-
-    const doc = snapshot.docs[0];
-    const data = doc.data();
-
-    return {
-      selection_id: doc.id,
-      team_id: teamId,
-      problem_id: data?.problem_id || null,
-      problem_title: data?.problem_title || null,
-      selected_at: toIsoString(data?.selected_at || data?.created_at),
-    };
-  } catch {
+async function loadTeamSelection(teamId, problemCatalog) {
+  const selectedProblem = await readTeamProblemSelection(adminDb, teamId);
+  if (!selectedProblem) {
     return null;
   }
+
+  const matchedProblem = (problemCatalog || []).find(
+    (problem) => problem.id === selectedProblem.problem_id
+  );
+
+  return {
+    ...selectedProblem,
+    problem_title: selectedProblem.problem_title || matchedProblem?.title || null,
+    problem_description:
+      selectedProblem.problem_description || matchedProblem?.description || "",
+  };
 }
 
-function buildUpdates(payment, selectedProblem, problemStatementsCount) {
+function buildUpdates(payment, selectedProblem, problemStatementsCount, effectiveState, teamFrozen) {
   const updates = [];
 
   if (payment?.status === "verified") {
@@ -133,12 +129,39 @@ function buildUpdates(payment, selectedProblem, problemStatementsCount) {
     updates.push("Payment is pending verification.");
   }
 
-  if (selectedProblem?.problem_id || selectedProblem?.problem_title) {
+  const problemStatus = String(effectiveState?.problemStatements?.status || "DISABLED").toUpperCase();
+  const problemReleaseAt = effectiveState?.problemStatements?.releaseAt;
+
+  if (problemStatus === "SCHEDULED") {
+    updates.push(
+      `Problem statements will be released at ${toIstDateLabel(problemReleaseAt)} (${EVENT_TIME_ZONE_LABEL}).`
+    );
+  } else if (problemStatus === "DISABLED") {
+    updates.push("Problem statements are currently disabled by admin controls.");
+  } else if (selectedProblem?.problem_id || selectedProblem?.problem_title) {
     updates.push("Problem statement selected by your team.");
   } else if (problemStatementsCount > 0) {
     updates.push("Problem statements are available. Please complete your selection.");
   } else {
     updates.push("Problem statements are not published yet.");
+  }
+
+  const freezeStatus = String(effectiveState?.freeze?.status || "DISABLED").toUpperCase();
+  const freezeOpenAt = effectiveState?.freeze?.openAt;
+  const freezeCloseAt = effectiveState?.freeze?.closeAt;
+
+  if (teamFrozen) {
+    updates.push("Your team workspace is frozen and no further team edits are allowed.");
+  } else if (freezeStatus === "OPEN") {
+    updates.push("Freeze window is open. Team lead can lock the workspace now.");
+  } else if (freezeStatus === "SCHEDULED") {
+    updates.push(
+      `Freeze window starts at ${toIstDateLabel(freezeOpenAt)} (${EVENT_TIME_ZONE_LABEL}).`
+    );
+  } else if (freezeStatus === "CLOSED") {
+    updates.push(
+      `Freeze window closed at ${toIstDateLabel(freezeCloseAt)} (${EVENT_TIME_ZONE_LABEL}).`
+    );
   }
 
   return updates;
@@ -229,12 +252,39 @@ export async function GET(request) {
         }
       }
 
-      const [problemStatements, selectedProblem] = await Promise.all([
-        loadProblemStatements(),
-        loadTeamSelection(teamDoc.id),
+      const controls = await readEventControlsFromDb(adminDb);
+      const effectiveState = buildPublicEventState(controls);
+      const problemStatementsLive = effectiveState?.problemStatements?.isLive === true;
+      const problemCatalog = getProblemStatementCatalog();
+
+      const [capacitySnapshot, selectedProblem] = await Promise.all([
+        problemStatementsLive
+          ? readProblemStatementCapacitySnapshot(adminDb, problemCatalog)
+          : Promise.resolve({
+              maxTeamsPerProblem: MAX_TEAMS_PER_PROBLEM,
+              counts: Object.fromEntries(problemCatalog.map((problem) => [problem.id, 0])),
+            }),
+        loadTeamSelection(teamDoc.id, problemCatalog),
       ]);
 
-      const updates = buildUpdates(payment, selectedProblem, problemStatements.length);
+      const problemStatements = problemStatementsLive
+        ? mapProblemStatementsWithCapacity({
+            catalog: problemCatalog,
+            capacitySnapshot,
+          })
+        : [];
+
+      const teamFreeze =
+        teamData?.freeze && typeof teamData.freeze === "object" ? teamData.freeze : {};
+      const teamFrozen = teamFreeze?.locked === true;
+
+      const updates = buildUpdates(
+        payment,
+        selectedProblem,
+        problemStatements.length,
+        effectiveState,
+        teamFrozen
+      );
 
       return NextResponse.json({
         success: true,
@@ -247,12 +297,29 @@ export async function GET(request) {
             college: teamData?.college || "",
             team_size: teamData?.team_size || memberIds.length,
             created_at: toIsoString(teamData?.created_at),
+            freeze: {
+              locked: teamFrozen,
+              locked_at: toIsoString(teamFreeze?.locked_at || teamFreeze?.lockedAt),
+              locked_by_uid: String(teamFreeze?.locked_by_uid || teamFreeze?.lockedByUid || ""),
+              locked_by_email: String(teamFreeze?.locked_by_email || teamFreeze?.lockedByEmail || ""),
+              source: String(teamFreeze?.source || ""),
+            },
           },
           members: members.map((member, index) => ({
             ...member,
             is_leader: index === 0,
           })),
           payment,
+          event_controls: {
+            timezone: EVENT_TIME_ZONE,
+            timezone_label: EVENT_TIME_ZONE_LABEL,
+            problem_statements: {
+              ...(effectiveState?.problemStatements || {}),
+              max_teams_per_problem:
+                capacitySnapshot?.maxTeamsPerProblem || MAX_TEAMS_PER_PROBLEM,
+            },
+            freeze: effectiveState?.freeze || null,
+          },
           selected_problem: selectedProblem,
           problem_statements: problemStatements,
           updates,

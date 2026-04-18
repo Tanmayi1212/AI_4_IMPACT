@@ -33,6 +33,7 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 !.env.example
+ai4impact-serviceAcc.json
 
 # vercel
 .vercel
@@ -43,3 +44,5 @@ next-env.d.ts
 
 # local scripts output
 scripts/output/
+
+.firebase/

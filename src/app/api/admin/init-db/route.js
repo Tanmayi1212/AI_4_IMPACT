@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { FieldValue } from "firebase-admin/firestore";
-import { adminDb } from "../../../../../firebaseAdmin";
+import { adminDb, FieldValue } from "../../../../../firebaseAdmin";
 import { requireAdmin } from "../_utils/auth";
+
+export const dynamic = "force-dynamic";
 
 export const runtime = "nodejs";
 
@@ -25,9 +26,12 @@ export async function POST(request) {
     await summaryRef.set({
       total_workshop: 0,
       total_hackathon: 0,
+      team_size_2: 0,
       team_size_3: 0,
       team_size_4: 0,
       colleges: {},
+      colleges_hackathon: {},
+      colleges_workshop: {},
       updated_at: FieldValue.serverTimestamp(),
     });
 

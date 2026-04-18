@@ -1,8 +1,16 @@
 import { NextResponse } from "next/server";
 import crypto from "node:crypto";
-import { FieldValue } from "firebase-admin/firestore";
-import { adminAuth, adminDb } from "../../../../../firebaseAdmin";
+import { adminAuth, adminDb, FieldValue } from "../../../../../firebaseAdmin";
 import { requireAdmin } from "../_utils/auth";
+import { invalidateAdminRegistrationsCache } from "../_utils/runtime-cache-invalidation";
+import { upsertAdminReadModelForTransaction } from "../../../../../lib/server/admin-read-model.js";
+import {
+  attemptCredentialSheetExportSync,
+  buildCredentialSheetExportEvent,
+  createCredentialSheetExportEventRef,
+} from "../_utils/credential-sheet-export";
+
+export const dynamic = "force-dynamic";
 
 export const runtime = "nodejs";
 
@@ -65,6 +73,51 @@ function generateStrongPassword(length = MIN_PASSWORD_LENGTH) {
 
 function hasStoredCredentials(accessCredentials) {
   return Boolean(asTrimmedString(accessCredentials?.team_id));
+}
+
+function isScreenshotPathCompatibleWithType(screenshotUrl, registrationType) {
+  const normalizedType = asTrimmedString(registrationType).toLowerCase();
+  if (!screenshotUrl || !normalizedType) {
+    return true;
+  }
+
+  try {
+    const parsed = new URL(screenshotUrl);
+    if (parsed.hostname !== "firebasestorage.googleapis.com") {
+      return true;
+    }
+
+    const segments = parsed.pathname.split("/").filter(Boolean);
+    const objectIndex = segments.indexOf("o");
+    if (objectIndex === -1 || objectIndex + 1 >= segments.length) {
+      return true;
+    }
+
+    const objectPath = decodeURIComponent(segments.slice(objectIndex + 1).join("/"));
+    if (!objectPath) {
+      return true;
+    }
+
+    // Keep legacy temp uploads valid while enforcing separated workshop/hackathon buckets.
+    if (objectPath.startsWith("payments/temp_")) {
+      return true;
+    }
+
+    if (objectPath.startsWith(`payments/${normalizedType}/`)) {
+      return true;
+    }
+
+    if (
+      objectPath.startsWith("payments/workshop/") ||
+      objectPath.startsWith("payments/hackathon/")
+    ) {
+      return false;
+    }
+
+    return true;
+  } catch {
+    return true;
+  }
 }
 
 function readExistingTeamAccess(registrationData) {
@@ -251,6 +304,12 @@ export async function POST(request) {
     const registrationType = transactionData?.registration_type;
     const registrationRefId = transactionData?.registration_ref;
 
+    if (!isScreenshotPathCompatibleWithType(transactionData?.screenshot_url, registrationType)) {
+      return badRequest(
+        "Transaction screenshot path does not match registration_type. Keep workshop and hackathon uploads separate."
+      );
+    }
+
     let registrationCollection = null;
     if (registrationType === "workshop") {
       registrationCollection = "workshop_registrations";
@@ -277,6 +336,7 @@ export async function POST(request) {
     const paymentVerified = action === "verify";
 
     let accessCredentials = null;
+    let credentialSheetEventRef = null;
 
     if (action === "verify" && registrationType === "hackathon") {
       const teamLead = await getTeamLeadFromRegistration(registrationData);
@@ -344,11 +404,56 @@ export async function POST(request) {
 
     batch.update(registrationRef, registrationUpdates);
 
+    if (action === "verify" && registrationType === "hackathon" && accessCredentials) {
+      const memberCount = Array.isArray(registrationData?.member_ids)
+        ? registrationData.member_ids.length
+        : 0;
+
+      credentialSheetEventRef = createCredentialSheetExportEventRef();
+      batch.set(
+        credentialSheetEventRef,
+        buildCredentialSheetExportEvent({
+          eventType: "VERIFY_ISSUE",
+          transactionId,
+          registrationRef: registrationRefId,
+          registrationType,
+          issuedByAdminUid: authResult.decodedToken.uid,
+          issuedByAdminEmail: authResult.decodedToken.email || "",
+          credential: accessCredentials,
+          registration: {
+            college_name: registrationData?.college || "",
+            team_size: registrationData?.team_size || memberCount || null,
+          },
+          source: "api/admin/verify-payment",
+          notes: "Credentials issued during payment verification.",
+        })
+      );
+    }
+
     await batch.commit();
+
+    if (credentialSheetEventRef) {
+      const sheetSyncResult = await attemptCredentialSheetExportSync({
+        eventId: credentialSheetEventRef.id,
+      });
+
+      if (!sheetSyncResult?.success && !sheetSyncResult?.skipped) {
+        console.error("Credential sheet sync failed after verify action:", sheetSyncResult.error);
+      }
+    }
+
+    try {
+      await upsertAdminReadModelForTransaction(transactionId);
+    } catch (readModelError) {
+      console.error("Failed to upsert admin read model after verify-payment:", readModelError);
+    }
+
+    invalidateAdminRegistrationsCache();
 
     return NextResponse.json({
       success: true,
       access_credentials: accessCredentials,
+      credential_export_event_id: credentialSheetEventRef?.id || null,
     });
   } catch (error) {
     console.error("Payment verification update failed:", error);

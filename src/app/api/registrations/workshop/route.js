@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import { FieldValue } from "firebase-admin/firestore";
-import { adminDb } from "../../../../../lib/admin";
+import { adminDb, FieldValue } from "../../../../../lib/admin";
 import { PHASES } from "../../../../../lib/constants/phases";
 import { verifyRequestWithProfile } from "../../../../../lib/server/auth";
 import { getHackathonConfig } from "../../../../../lib/server/hackathon";
+
+export const dynamic = "force-static";
 
 function clean(value) {
   return String(value || "").trim();

@@ -5,6 +5,8 @@ const { initializeApp, cert, getApps } = require("firebase-admin/app");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { getStorage } = require("firebase-admin/storage");
 
+const PRODUCTION_PROJECT_IDS = new Set(["ai4impact-cc315"]);
+
 function loadEnvFile(filePath) {
   if (!fs.existsSync(filePath)) return;
 
@@ -59,13 +61,27 @@ function initAdmin() {
   }
 
   return {
+    projectId,
     db: getFirestore(),
     bucket: getStorage().bucket(storageBucket),
   };
 }
 
+function assertSafeTargetProject(projectId) {
+  const explicitOverride =
+    process.env.ALLOW_PRODUCTION_TEST_MUTATION ===
+    "YES_RUN_TEST_MUTATION_ON_PRODUCTION";
+
+  if (PRODUCTION_PROJECT_IDS.has(projectId) && !explicitOverride) {
+    throw new Error(
+      `Refusing to run mutation test script on production project ${projectId}. Set ALLOW_PRODUCTION_TEST_MUTATION=YES_RUN_TEST_MUTATION_ON_PRODUCTION only if you intentionally want this.`
+    );
+  }
+}
+
 async function main() {
-  const { db, bucket } = initAdmin();
+  const { projectId, db, bucket } = initAdmin();
+  assertSafeTargetProject(projectId);
 
   const duplicateEmail = `dup-${Date.now()}@example.com`;
   const participantRef = db.collection("participants").doc();

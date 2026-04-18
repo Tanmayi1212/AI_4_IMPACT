@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { POST as uploadPaymentScreenshot } from "./payment-screenshot/route";
 
+export const dynamic = "force-static";
+
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const RATE_LIMIT_MAX_REQUESTS = 8;
 const uploadRateLimitStore = globalThis.__uploadRateLimitStore || new Map();

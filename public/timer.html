@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 4 IMPACT | RUNTIME_CLOCK</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@100;400;900&family=JetBrains+Mono:wght@700&family=Syncopate:wght@700&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --neon-cyan: #00FFFF;
+            --neon-purple: #8D36D5;
+            --dark-bg: #07020E;
+            --surface: rgba(255, 255, 255, 0.05);
+            --border: rgba(255, 255, 255, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: var(--dark-bg);
+            color: #EDE8F5;
+            font-family: 'Outfit', sans-serif;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            background-image:
+                radial-gradient(circle at 0% 0%, rgba(141, 54, 213, 0.2) 0%, transparent 50%),
+                radial-gradient(circle at 100% 100%, rgba(0, 255, 255, 0.15) 0%, transparent 50%);
+        }
+
+        .grid-layers {
+            position: fixed;
+            inset: -100px;
+            z-index: -1;
+            perspective: 1000px;
+            overflow: hidden;
+        }
+
+        .grid-pattern {
+            position: absolute;
+            inset: 0;
+            background-image: 
+                linear-gradient(var(--border) 1px, transparent 1px), 
+                linear-gradient(90deg, var(--border) 1px, transparent 1px);
+            background-size: 80px 80px;
+            transform: rotateX(45deg) scale(2);
+            transform-origin: center;
+            animation: gridMove 40s linear infinite;
+            mask-image: radial-gradient(circle at center, black, transparent 80%);
+            opacity: 0.3;
+        }
+
+        @keyframes gridMove {
+            0% { background-position: 0 0; }
+            100% { background-position: 0 800px; }
+        }
+
+        .container {
+            text-align: center;
+            z-index: 10;
+            width: 100%;
+            max-width: 1400px;
+            padding: 2rem;
+        }
+
+        .header {
+            margin-bottom: 5rem;
+            animation: fadeInDown 1.2s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .header img {
+            width: 150px;
+            height: auto;
+            filter: drop-shadow(0 0 40px rgba(141, 54, 213, 0.5));
+            margin-bottom: 2rem;
+            transition: transform 0.3s;
+        }
+
+        h1 {
+            font-family: 'Syncopate', sans-serif;
+            font-size: clamp(3rem, 8vw, 6.5rem);
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            text-transform: uppercase;
+            line-height: 0.9;
+            margin-bottom: 1rem;
+            background: linear-gradient(to bottom, #fff, #999);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .subtitle {
+            font-size: 1.125rem;
+            color: var(--neon-purple);
+            letter-spacing: 0.8em;
+            text-transform: uppercase;
+            font-weight: 900;
+        }
+
+        .timer-display {
+            display: flex;
+            gap: 3rem;
+            justify-content: center;
+            align-items: center;
+            margin: 4rem 0;
+        }
+
+        .time-group {
+            position: relative;
+            flex: 1;
+            max-width: 320px;
+        }
+
+        .time-box {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 40px;
+            padding: 4rem 2rem;
+            backdrop-filter: blur(40px);
+            position: relative;
+            overflow: hidden;
+            transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+            box-shadow: 0 40px 100px rgba(0,0,0,0.5);
+        }
+
+        .time-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: clamp(4rem, 11vw, 10rem);
+            font-weight: 700;
+            color: #fff;
+            line-height: 1;
+            display: block;
+            margin-bottom: 1.5rem;
+            letter-spacing: -0.05em;
+            text-shadow: 0 0 50px rgba(255,255,255,0.1);
+        }
+
+        .time-label {
+            font-size: 1rem;
+            font-weight: 900;
+            color: var(--neon-purple);
+            letter-spacing: 0.5em;
+            text-transform: uppercase;
+            opacity: 0.8;
+        }
+
+        .colon {
+            font-size: 7rem;
+            font-weight: 100;
+            color: var(--border);
+            margin-bottom: 2rem;
+            opacity: 0.5;
+            animation: pulseOpacity 2s infinite;
+        }
+
+        @keyframes pulseOpacity {
+            0%, 100% { opacity: 0.2; }
+            50% { opacity: 0.8; }
+        }
+
+        #overlay {
+            position: fixed;
+            inset: 0;
+            background: #010101;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 3rem;
+            transition: all 1s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .activate-btn {
+            background: transparent;
+            border: 2px solid var(--neon-cyan);
+            color: var(--neon-cyan);
+            padding: 1.5rem 3.5rem;
+            border-radius: 16px;
+            font-family: 'JetBrains Mono';
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.3em;
+            cursor: pointer;
+            transition: all 0.4s;
+            font-size: 0.875rem;
+            box-shadow: 0 0 30px rgba(0, 255, 255, 0.1);
+        }
+
+        .activate-btn:hover {
+            background: var(--neon-cyan);
+            color: #000;
+            box-shadow: 0 0 60px var(--neon-cyan);
+        }
+
+        @keyframes fadeInDown {
+            from { opacity: 0; transform: translateY(-40px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @media (max-width: 1024px) {
+            .timer-display { gap: 1rem; flex-wrap: wrap; }
+            .time-box { padding: 2.5rem 1rem; min-width: 140px; }
+            .colon { display: none; }
+            .container { padding: 1.5rem; }
+            .header img { width: 100px; }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="grid-layers">
+        <div class="grid-pattern"></div>
+    </div>
+    
+    <div class="container">
+        <header class="header">
+            <img src="/site-icon.png" alt="AI4 Impact Logo">
+            <h1>AI 4 IMPACT</h1>
+            <p class="subtitle">RUNTIME_REMAINING</p>
+        </header>
+
+        <main class="timer-display">
+            <div class="time-group">
+                <div class="time-box">
+                    <span class="time-value" id="hours">--</span>
+                    <span class="time-label">HOURS</span>
+                </div>
+            </div>
+            
+            <div class="colon">:</div>
+
+            <div class="time-group">
+                <div class="time-box">
+                    <span class="time-value" id="minutes">--</span>
+                    <span class="time-label">MINS</span>
+                </div>
+            </div>
+
+            <div class="colon">:</div>
+
+            <div class="time-group">
+                <div class="time-box">
+                    <span class="time-value" id="seconds">--</span>
+                    <span class="time-label">SECS</span>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Initialization Overlay -->
+    <div id="overlay">
+        <div style="margin-bottom: 2rem;">
+            <img src="/site-icon.png" alt="AI Logo" style="height: 120px; filter: drop-shadow(0 0 50px rgba(141, 54, 213, 0.5));">
+        </div>
+        <button class="activate-btn" onclick="activateSystem()">
+            [ BOOT_SEQUENCE ]
+        </button>
+        <p style="font-size: 0.75rem; color: rgba(255,255,255,0.3); letter-spacing: 0.2em;">PRESS TO INITIALIZE REAL-TIME TRACKING</p>
+    </div>
+
+    <script>
+        let targetTime = null;
+        let timerStarted = false;
+
+        function activateSystem() {
+            const doc = document.documentElement;
+            if (doc.requestFullscreen) doc.requestFullscreen();
+            else if (doc.webkitRequestFullscreen) doc.webkitRequestFullscreen();
+
+            const overlay = document.getElementById('overlay');
+            overlay.style.opacity = '0';
+            overlay.style.pointerEvents = 'none';
+
+            setTimeout(() => {
+                overlay.style.display = 'none';
+                const TARGET_ISO = "2026-04-18T16:30:00+05:30";
+                targetTime = new Date(TARGET_ISO).getTime();
+                timerStarted = true;
+                updateTimer();
+                setInterval(updateTimer, 1000);
+            }, 800);
+        }
+
+        function updateTimer() {
+            if (!timerStarted) return;
+            const now = Date.now();
+            const diff = targetTime - now;
+            if (diff <= 0) {
+                document.getElementById('hours').innerText = '00';
+                document.getElementById('minutes').innerText = '00';
+                document.getElementById('seconds').innerText = '00';
+                return;
+            }
+            const h = Math.floor(diff / (1000 * 60 * 60));
+            const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+            const s = Math.floor((diff % (1000 * 60)) / 1000);
+            document.getElementById('hours').innerText = String(h).padStart(2, '0');
+            document.getElementById('minutes').innerText = String(m).padStart(2, '0');
+            document.getElementById('seconds').innerText = String(s).padStart(2, '0');
+        }
+    </script>
+</body>
+
+</html>

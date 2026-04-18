@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { adminDb } from "../../../../../../firebaseAdmin";
 
+export const dynamic = "force-dynamic";
+
 export const runtime = "nodejs";
 
 function badRequest(error) {

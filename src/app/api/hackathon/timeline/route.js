@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getHackathonConfig } from "../../../../../lib/server/hackathon";
 
+export const dynamic = "force-static";
+
 function toMillis(value) {
   if (!value) return NaN;
   if (typeof value?.toMillis === "function") return value.toMillis();

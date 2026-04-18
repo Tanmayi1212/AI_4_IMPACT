@@ -1,110 +1,55 @@
 import { NextResponse } from "next/server";
-import { adminDb } from "../../../../../firebaseAdmin";
 import { requireAdmin } from "../_utils/auth";
+import { getServerFeatureFlags } from "../../../../../lib/server/feature-flags";
+import { readThroughRuntimeCache } from "../../../../../lib/server/runtime-cache";
+import { ADMIN_REGISTRATIONS_CACHE_PREFIX } from "../../../../../lib/server/runtime-cache-keys";
+import { loadAdminRegistrationsPayload } from "../../../../../lib/server/admin-read-model.js";
+
+export const dynamic = "force-dynamic";
 
 export const runtime = "nodejs";
 
 const ALLOWED_TYPES = new Set(["workshop", "hackathon"]);
 const ALLOWED_STATUSES = new Set(["pending", "verified", "rejected"]);
+const ENV = globalThis?.process?.env || {};
+const ADMIN_REGISTRATIONS_CACHE_TTL_MS = Number(
+  ENV.ADMIN_REGISTRATIONS_CACHE_TTL_MS || 300000
+);
 
-function toIsoString(value) {
-  if (!value) return null;
-  if (typeof value.toDate === "function") {
-    return value.toDate().toISOString();
+function asTrimmedString(value) {
+  return String(value || "").trim();
+}
+
+function toPositiveInteger(value, fallbackValue) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric <= 0) {
+    return fallbackValue;
   }
 
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+  return Math.floor(numeric);
+}
+
+function toOptionalPositiveInteger(value) {
+  const normalized = asTrimmedString(value);
+  if (!normalized) {
+    return null;
+  }
+
+  const numeric = Number(normalized);
+  if (!Number.isFinite(numeric) || numeric <= 0) {
+    return null;
+  }
+
+  return Math.floor(numeric);
+}
+
+function toCacheSegment(value, fallbackValue = "all") {
+  const normalized = asTrimmedString(value).toLowerCase();
+  return normalized || fallbackValue;
 }
 
 function badRequest(error) {
   return NextResponse.json({ error }, { status: 400 });
-}
-
-async function loadWorkshopRegistration(registrationRef) {
-  const workshopDoc = await adminDb
-    .collection("workshop_registrations")
-    .doc(registrationRef)
-    .get();
-
-  if (!workshopDoc.exists) {
-    return null;
-  }
-
-  const workshopData = workshopDoc.data();
-  const participantId = workshopData?.participant_id;
-  let participant = null;
-
-  if (participantId) {
-    const participantDoc = await adminDb.collection("participants").doc(participantId).get();
-    if (participantDoc.exists) {
-      const participantData = participantDoc.data();
-      participant = {
-        name: participantData?.name || null,
-        email: participantData?.email || null,
-        phone: participantData?.phone || null,
-        college: workshopData?.college || null,
-      };
-    }
-  }
-
-  return {
-    workshop_id: workshopDoc.id,
-    participant,
-  };
-}
-
-async function loadHackathonRegistration(registrationRef) {
-  const teamDoc = await adminDb
-    .collection("hackathon_registrations")
-    .doc(registrationRef)
-    .get();
-
-  if (!teamDoc.exists) {
-    return null;
-  }
-
-  const teamData = teamDoc.data();
-  const memberIds = Array.isArray(teamData?.member_ids) ? teamData.member_ids : [];
-
-  const memberDocs = await Promise.all(
-    memberIds.map((participantId) => adminDb.collection("participants").doc(participantId).get())
-  );
-
-  const members = memberDocs
-    .filter((doc) => doc.exists)
-    .map((doc) => {
-      const data = doc.data();
-      return {
-        participant_id: doc.id,
-        name: data?.name || null,
-        email: data?.email || null,
-        phone: data?.phone || null,
-      };
-    });
-
-  const rawAccessCredentials = teamData?.access_credentials || null;
-  const accessCredentials = rawAccessCredentials || teamData?.team_access_id
-    ? {
-        team_id: teamData?.team_access_id || rawAccessCredentials?.team_id || null,
-        leader_name: rawAccessCredentials?.leader_name || null,
-        leader_email: rawAccessCredentials?.leader_email || null,
-        leader_phone: rawAccessCredentials?.leader_phone || null,
-        auth_uid: teamData?.team_lead_auth_uid || rawAccessCredentials?.auth_uid || null,
-        password_version: rawAccessCredentials?.password_version || null,
-        generated_at: toIsoString(rawAccessCredentials?.generated_at),
-        updated_at: toIsoString(rawAccessCredentials?.updated_at),
-      }
-    : null;
-
-  return {
-    team_id: teamDoc.id,
-    team_name: teamData?.team_name || null,
-    college: teamData?.college || null,
-    team_size: teamData?.team_size || null,
-    members,
-    access_credentials: accessCredentials,
-  };
 }
 
 export async function GET(request) {
@@ -117,6 +62,8 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const type = searchParams.get("type");
     const status = searchParams.get("status");
+    const limit = toOptionalPositiveInteger(searchParams.get("limit"));
+    const cursor = asTrimmedString(searchParams.get("cursor"));
 
     if (type && !ALLOWED_TYPES.has(type)) {
       return badRequest("type must be workshop or hackathon.");
@@ -126,44 +73,67 @@ export async function GET(request) {
       return badRequest("status must be pending, verified, or rejected.");
     }
 
-    let query = adminDb.collection("transactions");
-    if (status) {
-      query = query.where("status", "==", status);
-    }
-    if (type) {
-      query = query.where("registration_type", "==", type);
+    if (limit !== null && limit > 500) {
+      return badRequest("limit must be less than or equal to 500.");
     }
 
-    const transactionsSnapshot = await query.orderBy("created_at", "desc").get();
+    const bypassCache =
+      asTrimmedString(searchParams.get("fresh")) === "1" ||
+      asTrimmedString(request.headers.get("x-admin-bypass-cache")) === "1" ||
+      asTrimmedString(request.headers.get("x-admin-cache-bypass")) === "1";
 
-    const filteredTransactions = transactionsSnapshot.docs
-      .map((doc) => ({ id: doc.id, ...doc.data() }));
+    const serverFlags = getServerFeatureFlags();
+    const cacheEnabled = serverFlags.adminRegistrationsCacheEnabled !== false;
+    const preferReadModel = serverFlags.adminReadModelEnabled === true;
+    const cacheTtlMs = toPositiveInteger(ADMIN_REGISTRATIONS_CACHE_TTL_MS, 45000);
+    const cacheKey = `${ADMIN_REGISTRATIONS_CACHE_PREFIX}:${toCacheSegment(type)}:${toCacheSegment(
+      status
+    )}:${toCacheSegment(limit === null ? "all" : String(limit))}:${toCacheSegment(
+      cursor || "start"
+    )}`;
 
-    const registrations = await Promise.all(
-      filteredTransactions.map(async (transaction) => {
-        let registration = null;
-
-        if (transaction.registration_type === "workshop") {
-          registration = await loadWorkshopRegistration(transaction.registration_ref);
-        } else if (transaction.registration_type === "hackathon") {
-          registration = await loadHackathonRegistration(transaction.registration_ref);
-        }
+    const cacheResult = await readThroughRuntimeCache({
+      cacheKey,
+      ttlMs: cacheTtlMs,
+      bypass: !cacheEnabled || bypassCache,
+      loader: async () => {
+        const loaded = await loadAdminRegistrationsPayload({
+          type,
+          status,
+          preferReadModel,
+          limit,
+          cursor: cursor || null,
+        });
 
         return {
-          transaction_id: transaction.transaction_id || transaction.id,
-          registration_type: transaction.registration_type || null,
-          status: transaction.status || null,
-          amount: transaction.amount || null,
-          upi_transaction_id: transaction.upi_transaction_id || null,
-          screenshot_url: transaction.screenshot_url || null,
-          created_at: toIsoString(transaction.created_at),
-          verified_at: toIsoString(transaction.verified_at),
-          registration,
+          ...loaded.payload,
+          _meta: {
+            source: loaded.source,
+          },
         };
-      })
-    );
+      },
+    });
 
-    return NextResponse.json({ success: true, registrations });
+    const payload = cacheResult.payload || { success: true, registrations: [] };
+    const responseBody = {
+      success: payload.success === true,
+      registrations: Array.isArray(payload.registrations) ? payload.registrations : [],
+      pagination:
+        payload && typeof payload.pagination === "object" && payload.pagination
+          ? payload.pagination
+          : null,
+    };
+
+    const response = NextResponse.json(responseBody);
+    response.headers.set(
+      "x-runtime-cache",
+      cacheResult.cacheHit ? "HIT" : cacheResult.coalesced ? "COALESCED" : "MISS"
+    );
+    response.headers.set(
+      "x-admin-data-source",
+      asTrimmedString(payload?._meta?.source) || "source"
+    );
+    return response;
   } catch (error) {
     console.error("Failed to load admin registrations:", error);
     return NextResponse.json(

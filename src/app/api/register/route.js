@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { POST as registerHackathon } from "./hackathon/route";
 import { cleanupTempScreenshot } from "./_utils/screenshotCleanup";
 
+export const dynamic = "force-static";
+
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const RATE_LIMIT_MAX_REQUESTS = 5;
 const registerRateLimitStore = globalThis.__registerRateLimitStore || new Map();
@@ -58,6 +60,9 @@ export async function POST(request) {
     const participants = Array.isArray(body?.participants) ? body.participants : [];
     const transactionId = asTrimmedString(body?.payment?.transactionId);
     const screenshotUrl = asTrimmedString(body?.payment?.screenshotUrl);
+    const idempotencyKey = asTrimmedString(
+      request.headers.get("x-idempotency-key") || body?.idempotency_key
+    );
 
     if (!teamName || !collegeName || !participants.length || !transactionId || !screenshotUrl) {
       return NextResponse.json(
@@ -77,11 +82,17 @@ export async function POST(request) {
       })),
       upi_transaction_id: transactionId,
       screenshot_url: screenshotUrl,
+      idempotency_key: idempotencyKey || undefined,
     };
+
+    const proxyHeaders = { "Content-Type": "application/json" };
+    if (idempotencyKey) {
+      proxyHeaders["x-idempotency-key"] = idempotencyKey;
+    }
 
     const proxyRequest = new Request(request.url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: proxyHeaders,
       body: JSON.stringify(proxyBody),
     });
 
